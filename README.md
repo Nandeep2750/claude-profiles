@@ -71,6 +71,16 @@ columns tell you which account has room **before** you start, rather than
 finding out mid-conversation. Both limits are shown because they run on separate
 clocks: `work` above is fine for the next five hours but 87% through its week.
 
+Those figures are cached. For current ones:
+
+```sh
+claude-profiles --live
+```
+
+Fetches each signed-in account in parallel and costs **no model tokens** — it
+reads a usage endpoint, it does not run a prompt. Failures fall back to the
+cached value rather than breaking the table.
+
 ## Commands
 
 | Command | Does |
@@ -81,6 +91,7 @@ clocks: `work` above is fine for the next five hours but 87% through its week.
 | `claude-handoff NAME` | Copy this directory's latest conversation to another account |
 | `claude-profile-remove NAME` | Delete a profile, its conversations and its credentials |
 | `claude-doctor` | Check the installation for problems |
+| `claude-profiles --live` | Current usage instead of the cached snapshot |
 
 Tab completion works on all of them.
 [Full reference →](https://nandeep2750.github.io/claude-profiles/commands/)

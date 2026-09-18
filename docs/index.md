@@ -70,8 +70,21 @@ claude-profiles          # see every profile and who is signed into it
 
 Two accounts signed in at once is normal - that is the whole point. The usage
 columns show which one has room before you start, so you are not surprised
-mid-conversation. `work` above is fine for the next five hours but 87% through
-its week.
+mid-conversation. Both limits are shown because they run on separate clocks:
+`work` above is fine for the next five hours but 87% through its week.
+
+Those figures come from a cache Claude Code refreshes at most every five
+minutes, and only while that profile is running - so add `--live` when the
+numbers actually matter:
+
+```sh
+claude-profiles --live
+```
+
+It fetches each signed-in account's current usage in parallel and costs **no
+model tokens** - it reads a usage endpoint, it does not run a prompt. Any
+profile whose fetch fails falls back to its cached value rather than breaking
+the table. [More →](commands.md#live-figures)
 
 !!! info "Profiles share nothing"
     Each profile is a complete, separate copy of Claude Code's configuration -
@@ -94,6 +107,7 @@ see [How it works](how-it-works.md) for the details.
 | `claude-handoff NAME` | Copy this directory's latest conversation to profile `NAME` |
 | `claude-profile-remove NAME` | Delete a profile, its conversations and its credentials |
 | `claude-doctor` | Check the installation for problems |
+| `claude-profiles --live` | Current usage figures instead of the cached snapshot |
 
 Full flag reference: [Commands](commands.md).
 
