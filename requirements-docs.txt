@@ -1,4 +1,4 @@
 # Pinned: MkDocs 2.0 removes the plugin system and breaks theme overrides,
 # with no migration path. See squidfunk.github.io/mkdocs-material/blog/2026/02/18/mkdocs-2.0/
 mkdocs>=1.6,<2.0
-mkdocs-material>=9.5,<10.0
+mkdocs-material>=9.7.7,<10.0
