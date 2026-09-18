@@ -106,7 +106,7 @@ def usage_of(pdir):
 
 
 def until(iso):
-    """'in 54m' / 'in 1h14m' / 'in 4d23h' for an ISO timestamp, or '-'."""
+    """'in 54m' / 'in 1h 14m' / 'in 4d 23h' for an ISO timestamp, or '-'."""
     if not iso:
         return "-"
     try:
@@ -119,8 +119,8 @@ def until(iso):
     if d < 3600:
         return f"in {int(d//60)}m"
     if d < 86400:
-        return f"in {int(d//3600)}h{int(d%3600//60):02d}m"
-    return f"in {int(d//86400)}d{int(d%86400//3600)}h"
+        return f"in {int(d//3600)}h {int(d%3600//60):02d}m"
+    return f"in {int(d//86400)}d {int(d%86400//3600)}h"
 
 
 def ago(sec):
@@ -230,18 +230,18 @@ def cmd_status(a):
         head += f"{'CONFIG DIR':<{wD}}"
     head += f"{'ACCOUNT':<{wE}}{'AUTH':<6}"
     if not a.no_usage:
-        head += f"{'5-HOUR':<18}{'7-DAY':<18}{'AS OF'}"
+        head += f"{'5-HOUR':<19}{'7-DAY':<19}{'AS OF'}"
     print(C(head.rstrip(), "b"))
 
     def pct_cell(bucket):
         if not bucket or bucket.get("pct") is None:
-            return f"{'-':<18}"
+            return f"{'-':<19}"
         pct = bucket["pct"]
         tone = "rd" if pct >= 90 else ("yl" if pct >= 75 else "gr")
         if bucket.get("locked"):
             return C(f"{'locked':<18}", "rd")
         cell = f"{pct}%"
-        return C(f"{cell:>4}", tone) + f"  {until(bucket['resets']):<12}"
+        return C(f"{cell:>4}", tone) + f"  {until(bucket['resets']):<13}"
 
     for r in rows:
         line = f"{'*' if r['name'] == act else ' ':<2}{r['name']:<{wN}}"
@@ -252,7 +252,7 @@ def cmd_status(a):
         u = r["usage"]
         if not a.no_usage:
             if not u:
-                line += f"{'-':<18}{'-':<18}" + C("never used", "dim")
+                line += f"{'-':<19}{'-':<19}" + C("never used", "dim")
             else:
                 line += pct_cell(u.get("5h")) + pct_cell(u.get("7d"))
                 stale = u["age"] > 86400

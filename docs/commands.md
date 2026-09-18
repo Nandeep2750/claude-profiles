@@ -48,10 +48,10 @@ List every profile, which account is signed into it, whether credentials are
 present, and how much of each account's usage limit is consumed.
 
 ```
-   PROFILE  ACCOUNT              AUTH  5-HOUR            7-DAY             AS OF
-*  default  you@example.com      ok     59%  in 53m       40%  in 4d23h    1h ago
-   work     you@company.com      ok      3%  in 1h13m     87%  in 2d18h    2h ago
-   client   (not logged in)      none  -                 -                 never used
+   PROFILE  ACCOUNT              AUTH  5-HOUR             7-DAY              AS OF
+*  default  you@example.com      ok     59%  in 53m        40%  in 4d 23h    1h ago
+   work     you@company.com      ok      3%  in 1h 13m     87%  in 2d 18h    2h ago
+   client   (not logged in)      none  -                  -                  never used
 ```
 
 | Column | Meaning |
