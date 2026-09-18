@@ -101,7 +101,7 @@ your messages, ignoring tool results and sidechains.
 ## `claude-handoff TARGET [SESSION]`
 
 Copy a conversation into another profile so that account can resume it. See the
-[guide](../README.md#hand-off-a-session-when-you-hit-a-limit) for what this is
+[guide](guides/handoff.md) for what this is
 for; this section is the mechanics.
 
 ```sh

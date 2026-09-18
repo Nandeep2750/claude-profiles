@@ -5,3 +5,4 @@
 *.jsonl
 .credentials.json
 .claude.json
+site/

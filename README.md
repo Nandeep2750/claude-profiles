@@ -1,5 +1,7 @@
 # claude-profiles
 
+**[Documentation](https://Nandeep2750.github.io/claude-profiles/)**
+
 Run multiple Claude Code accounts on one machine. Pick one per project, and move
 a conversation between accounts when one hits its usage limit.
 
@@ -207,9 +209,12 @@ Both directories are created for you. `install.sh` creates
 
 ## Further reading
 
-- [docs/commands.md](docs/commands.md) - every command and flag, with examples
-- [docs/how-it-works.md](docs/how-it-works.md) - the mechanism, storage layout, per-OS differences
-- [docs/troubleshooting.md](docs/troubleshooting.md) - common problems and fixes
+Full docs: **<https://Nandeep2750.github.io/claude-profiles/>**
+
+- [Getting started](docs/getting-started.md)
+- [Commands](docs/commands.md) - every command and flag, with examples
+- [How it works](docs/how-it-works.md) - the mechanism, storage layout, per-OS differences
+- [Troubleshooting](docs/troubleshooting.md) - common problems and fixes
 
 ## Uninstall
 

@@ -148,4 +148,4 @@ stable behaviour: an environment variable and the on-disk transcript location.
 `claude-sessions` additionally parses transcript contents to build summaries.
 That format is internal to Claude Code and could change in a future release. If
 summaries ever come out blank, that parsing is the thing to look at -
-`scan()` in `bin/claude-profiles.py`.
+`scan()` in [`bin/claude-profiles.py`](https://github.com/Nandeep2750/claude-profiles/blob/main/bin/claude-profiles.py).
