@@ -19,7 +19,14 @@ claude-profile() {
                [[ -d "$CLAUDE_CONFIG_DIR" ]] || mkdir -p "$CLAUDE_CONFIG_DIR" ;;
   esac
 }
-claude-profiles() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@" }
+# `claude-profiles` with no subcommand means `status`; anything else passes through.
+claude-profiles() {
+  case "$1" in
+    status|sessions|handoff|remove|doctor|path) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
+    *)                                          "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@" ;;
+  esac
+}
+claude-doctor()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" doctor "$@" }
 claude-sessions() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" sessions "$@" }
 claude-handoff()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" handoff  "$@" }
 
@@ -51,10 +58,11 @@ add-zsh-hook chpwd  _claude_profile_auto
 add-zsh-hook precmd _claude_profile_auto
 
 # completion
-if [[ -z "${_comps[compdef]}" ]] && ! whence compdef >/dev/null; then
+if ! whence compdef >/dev/null 2>&1; then
   autoload -Uz compinit
-  compinit -d "${XDG_CACHE_HOME:-$HOME/.cache}/zcompdump-$ZSH_VERSION"
+  compinit -d "${XDG_CACHE_HOME:-$HOME/.cache}/zcompdump-$ZSH_VERSION" 2>/dev/null
 fi
+if whence compdef >/dev/null 2>&1; then
 zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 zstyle ':completion:*:descriptions' format '%F{yellow}%d%f'
@@ -88,6 +96,13 @@ _claude_sessions() {
 compdef _claude_sessions claude-sessions
 
 _claude_profiles() {
+  if (( CURRENT == 2 )) && [[ "$words[2]" != -* ]]; then
+    local -a subs
+    subs=(status:'profiles, accounts and usage' doctor:'check the install for problems'
+          sessions:'list conversations' handoff:'copy a session to another profile'
+          remove:'delete a profile' path:'print a profile config dir')
+    _describe -t commands 'subcommand' subs && return
+  fi
   _arguments \
     '--live[fetch current usage from the API instead of the cache]' \
     '--dirs[show each profile'"'"'s config dir]' \
@@ -100,3 +115,4 @@ _claude_profile_remove() {
   _arguments '1:profile:_claude_profile_names' '(-y --yes)'{-y,--yes}'[skip confirmation]'
 }
 compdef _claude_profile_remove claude-profile-remove
+fi   # compdef available

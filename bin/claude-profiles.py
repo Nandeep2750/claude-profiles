@@ -115,7 +115,8 @@ def access_token(pdir):
     f = os.path.join(pdir, ".credentials.json")
     if os.path.isfile(f):
         try:
-            blob = json.load(open(f))
+            with open(f) as fh:
+                blob = json.load(fh)
         except Exception:
             blob = None
     if blob is None and IS_MAC:
@@ -608,6 +609,145 @@ def cmd_remove(a):
     return 0
 
 
+def keychain_entries():
+    """Every Claude Code credential service name currently in the Keychain."""
+    if not IS_MAC:
+        return []
+    try:
+        r = subprocess.run(["security", "dump-keychain"], capture_output=True,
+                           text=True, timeout=20)
+    except Exception:
+        return []
+    return sorted(set(re.findall(r'"(Claude Code-credentials[^"]*)"', r.stdout)))
+
+
+def find_markers(root=None, max_depth=4, budget=3.0):
+    """`.claude-profile` markers under $HOME, time-bounded."""
+    root = root or HOME
+    start, found = time.time(), []
+    skip = {"node_modules", "Library", "Applications", ".git", ".Trash",
+            "vendor", "venv", ".venv", "dist", "build", "Pictures", "Movies"}
+    for dirpath, dirs, files in os.walk(root):
+        if time.time() - start > budget:
+            dirs[:] = []
+            break
+        depth = dirpath[len(root):].count(os.sep)
+        if depth >= max_depth:
+            dirs[:] = []
+        dirs[:] = [d for d in dirs if d not in skip and not d.startswith(".")]
+        if ".claude-profile" in files:
+            f = os.path.join(dirpath, ".claude-profile")
+            try:
+                with open(f) as fh:
+                    name = fh.readline().strip()
+            except OSError:
+                name = ""
+            found.append((f, name))
+    return found
+
+
+def rc_files():
+    return [os.path.join(HOME, f) for f in (".zshrc", ".bashrc", ".bash_profile",
+                                            ".profile", ".zprofile")]
+
+
+def cmd_doctor(a):
+    C = color()
+    issues, warns = [], []
+
+    def ok(msg):    print(f"  {C('ok  ', 'gr')} {msg}")
+    def warn(msg):  print(f"  {C('warn', 'yl')} {msg}"); warns.append(msg)
+    def bad(msg):   print(f"  {C('FAIL', 'rd')} {msg}"); issues.append(msg)
+
+    print(C("environment", "b"))
+    for tool in ("python3", "claude"):
+        path = shutil.which(tool)
+        ok(f"{tool} found at {path}") if path else bad(f"{tool} is not on PATH")
+    cd = os.environ.get("CLAUDE_CONFIG_DIR")
+    if cd and not os.path.isdir(cd):
+        bad(f"CLAUDE_CONFIG_DIR points at a missing directory: {cd}")
+    elif cd:
+        ok(f"CLAUDE_CONFIG_DIR -> {cd.replace(HOME, '~')}")
+    else:
+        ok("CLAUDE_CONFIG_DIR unset (profile 'default')")
+    if not os.path.isdir(PROF_HOME):
+        warn(f"{PROF_HOME.replace(HOME, '~')} does not exist yet")
+    elif os.path.isdir(os.path.join(PROF_HOME, ".git")):
+        bad(f"{PROF_HOME.replace(HOME, '~')} is a git repo - account data must never be committed")
+    else:
+        ok(f"account data at {PROF_HOME.replace(HOME, '~')} (not a git repo)")
+
+    print(C("\nshell wiring", "b"))
+    wired = []
+    for rc in rc_files():
+        if not os.path.isfile(rc):
+            continue
+        with open(rc, errors="replace") as fh:
+            hits = [l for l in fh if "claude-profiles." in l and l.strip().startswith("source")]
+        if len(hits) > 1:
+            bad(f"{os.path.basename(rc)} sources the shell layer {len(hits)} times - remove the duplicates")
+        elif hits:
+            target = hits[0].split('"')[1] if '"' in hits[0] else hits[0].strip()
+            if os.path.isfile(os.path.expandvars(target.replace("$HOME", HOME))):
+                ok(f"{os.path.basename(rc)} -> {os.path.basename(target)}")
+            else:
+                bad(f"{os.path.basename(rc)} sources a file that does not exist: {target}")
+            wired.append(rc)
+    if not wired:
+        bad("no rc file sources the shell layer - run install.sh")
+
+    print(C("\nprofiles", "b"))
+    names = profile_names()
+    for n in names:
+        d = profile_dir(n)
+        if has_credentials(d):
+            ok(f"{n}: {account_email(d) or 'signed in'}")
+        else:
+            warn(f"{n}: not logged in - run 'claude-profile {n}' then /login")
+        cred = os.path.join(d, ".credentials.json")
+        if os.path.isfile(cred):
+            mode = os.stat(cred).st_mode & 0o777
+            if mode & 0o077:
+                bad(f"{n}: .credentials.json is {oct(mode)[2:]} - should be 600 "
+                    f"(chmod 600 {cred.replace(HOME, '~')})")
+
+    if IS_MAC:
+        print(C("\nkeychain", "b"))
+        live = {keychain_service(profile_dir(n)) for n in names}
+        entries = keychain_entries()
+        if not entries:
+            warn("could not read the keychain (or no entries yet)")
+        for e in entries:
+            if e in live:
+                ok(f"{e}")
+            else:
+                bad(f"{e} is orphaned - no profile maps to it "
+                    f"(security delete-generic-password -a \"$USER\" -s \"{e}\")")
+
+    print(C("\nproject markers", "b"))
+    markers = find_markers()
+    if not markers:
+        ok("no .claude-profile markers found (nothing to verify)")
+    for f, name in markers:
+        where = f.replace(HOME, "~")
+        if not name:
+            bad(f"{where} is empty")
+        elif name not in names:
+            bad(f"{where} points at '{name}', which is not a profile")
+        else:
+            ok(f"{where} -> {name}")
+
+    print()
+    if issues:
+        print(C(f"{len(issues)} problem(s), {len(warns)} warning(s)", "rd"))
+        return 1
+    if warns:
+        print(C(f"no problems, {len(warns)} warning(s)", "yl"))
+        return 0
+    print(C("all checks passed", "gr"))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(prog="claude-profiles")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -632,6 +772,9 @@ def main():
     p.add_argument("-d", "--dir", default=os.getcwd())
     p.add_argument("--plain", action="store_true", help="no borders - easier to pipe")
     p.set_defaults(fn=cmd_sessions)
+
+    p = sub.add_parser("doctor", help="check the installation for problems")
+    p.set_defaults(fn=cmd_doctor)
 
     p = sub.add_parser("remove", help="delete a profile and its credentials")
     p.add_argument("name")

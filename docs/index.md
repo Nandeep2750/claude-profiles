@@ -93,6 +93,7 @@ see [How it works](how-it-works.md) for the details.
 | `claude-sessions` | List this directory's conversations, readably |
 | `claude-handoff NAME` | Copy this directory's latest conversation to profile `NAME` |
 | `claude-profile-remove NAME` | Delete a profile, its conversations and its credentials |
+| `claude-doctor` | Check the installation for problems |
 
 Full flag reference: [Commands](commands.md).
 

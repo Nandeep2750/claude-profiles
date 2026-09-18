@@ -7,6 +7,7 @@
 Pick an account per project, and move a conversation between accounts
 when one hits its usage limit.
 
+[![CI](https://github.com/Nandeep2750/claude-profiles/actions/workflows/ci.yml/badge.svg)](https://github.com/Nandeep2750/claude-profiles/actions/workflows/ci.yml)
 [![Docs](https://github.com/Nandeep2750/claude-profiles/actions/workflows/docs.yml/badge.svg)](https://github.com/Nandeep2750/claude-profiles/actions/workflows/docs.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20WSL%20%7C%20Windows-blue)
@@ -30,22 +31,22 @@ out, and each account can only see its own conversation history.
 
 ## Quick start
 
+**macOS, Linux, WSL or Git-Bash**
+
 ```sh
 git clone https://github.com/Nandeep2750/claude-profiles.git ~/.claude-tools
 sh ~/.claude-tools/install.sh
 exec $SHELL -l
 ```
 
-<details>
-<summary>Windows (PowerShell)</summary>
+**Windows (PowerShell)**
 
 ```powershell
 git clone https://github.com/Nandeep2750/claude-profiles.git $HOME\.claude-tools
 pwsh -File $HOME\.claude-tools\install.ps1
 ```
-</details>
 
-Add an account:
+Then add an account:
 
 ```sh
 claude-profile work      # creates the profile
@@ -79,6 +80,7 @@ clocks: `work` above is fine for the next five hours but 87% through its week.
 | `claude-sessions` | List this directory's conversations, readably |
 | `claude-handoff NAME` | Copy this directory's latest conversation to another account |
 | `claude-profile-remove NAME` | Delete a profile, its conversations and its credentials |
+| `claude-doctor` | Check the installation for problems |
 
 Tab completion works on all of them.
 [Full reference →](https://nandeep2750.github.io/claude-profiles/commands/)
@@ -163,7 +165,21 @@ PowerShell.
 
 ## Contributing
 
-Issues and pull requests are welcome. To preview docs changes locally:
+Issues and pull requests are welcome.
+
+Run the tests:
+
+```sh
+python3 -m unittest discover -s tests -v   # core
+bash tests/test_shell.sh                   # shell layer, bash
+zsh  tests/test_shell.sh                   # shell layer, zsh
+```
+
+Everything runs against a throwaway `HOME`, so your real profiles and
+credentials are never touched. CI runs the same suite on Ubuntu and macOS
+against Python 3.9 and 3.13, plus a PowerShell check on Windows.
+
+Preview the docs locally:
 
 ```sh
 python3 -m venv .venv

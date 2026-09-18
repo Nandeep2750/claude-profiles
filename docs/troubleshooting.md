@@ -1,5 +1,11 @@
 # Troubleshooting
 
+Before anything else, run the built-in check - it finds most of what follows:
+
+```sh
+claude-doctor
+```
+
 ## `command not found: claude-profiles`
 
 The shell was started before the tooling was installed, or the `source` line is

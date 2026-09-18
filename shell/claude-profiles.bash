@@ -19,7 +19,14 @@ claude-profile() {
              [ -d "$CLAUDE_CONFIG_DIR" ] || mkdir -p "$CLAUDE_CONFIG_DIR" ;;
   esac
 }
-claude-profiles() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@"; }
+# `claude-profiles` with no subcommand means `status`; anything else passes through.
+claude-profiles() {
+  case "$1" in
+    status|sessions|handoff|remove|doctor|path) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
+    *)                                          "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@" ;;
+  esac
+}
+claude-doctor()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" doctor "$@"; }
 claude-sessions() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" sessions "$@"; }
 claude-handoff()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" handoff  "$@"; }
 
@@ -45,7 +52,7 @@ _claude_profile_auto() {
   done
   claude-profile "${name:-default}"
 }
-case "$PROMPT_COMMAND" in
+case "${PROMPT_COMMAND:-}" in
   *_claude_profile_auto*) ;;
   "") PROMPT_COMMAND="_claude_profile_auto" ;;
   *)  PROMPT_COMMAND="_claude_profile_auto;$PROMPT_COMMAND" ;;
@@ -60,4 +67,4 @@ complete -F _claude_profile_complete claude-profile
 complete -F _claude_profile_complete claude-profile-remove
 complete -F _claude_profile_complete claude-handoff
 complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir --plain" claude-sessions
-complete -W "--live --dirs --no-usage --plain" claude-profiles
+complete -W "status doctor sessions handoff remove path --live --dirs --no-usage --plain" claude-profiles

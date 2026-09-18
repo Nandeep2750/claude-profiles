@@ -28,6 +28,8 @@ function Get-ClaudeProfiles { & $script:Py $script:Core status @args }
 function Get-ClaudeSessions { & $script:Py $script:Core sessions @args }
 function Move-ClaudeSession { & $script:Py $script:Core handoff  @args }
 
+function Test-ClaudeProfiles { & $script:Py $script:Core doctor @args }
+
 function Remove-ClaudeProfile {
     [CmdletBinding()] param([Parameter(Position=0,Mandatory)][string]$Name,[switch]$Yes)
     $extra = if ($Yes) { @("--yes") } else { @() }
@@ -54,6 +56,7 @@ Set-Alias claude-profiles Get-ClaudeProfiles
 Set-Alias claude-sessions Get-ClaudeSessions
 Set-Alias claude-handoff  Move-ClaudeSession
 Set-Alias claude-profile-remove Remove-ClaudeProfile
+Set-Alias claude-doctor   Test-ClaudeProfiles
 
 Register-ArgumentCompleter -CommandName Set-ClaudeProfile -ParameterName Name -ScriptBlock {
     param($c,$p,$word)

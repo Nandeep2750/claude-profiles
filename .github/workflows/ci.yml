@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ['3.9', '3.13']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Core tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Shell layer (bash)
+        run: bash tests/test_shell.sh
+
+      - name: Shell layer (zsh)
+        run: |
+          if ! command -v zsh >/dev/null; then sudo apt-get update -qq && sudo apt-get install -y -qq zsh; fi
+          zsh tests/test_shell.sh
+
+      - name: Syntax check every shell file
+        run: |
+          bash -n shell/claude-profiles.bash
+          zsh  -n shell/claude-profiles.zsh
+          sh   -n install.sh
+          python -c "import ast,sys; ast.parse(open('bin/claude-profiles.py').read())"
+
+      - name: Installer runs on a clean HOME
+        run: |
+          FAKE=$(mktemp -d)
+          touch "$FAKE/.bashrc"
+          HOME="$FAKE" sh install.sh
+          grep -q "claude-profiles.bash" "$FAKE/.bashrc"
+          HOME="$FAKE" sh install.sh | grep -q "already wired"   # idempotent
+          test "$(grep -c 'claude-profiles.bash' "$FAKE/.bashrc")" -eq 1
+
+  powershell:
+    name: windows / powershell
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Module imports and exports its commands
+        shell: pwsh
+        run: |
+          Import-Module ./shell/ClaudeProfiles.psm1 -Force
+          foreach ($c in 'Set-ClaudeProfile','Get-ClaudeProfiles','Get-ClaudeSessions',
+                         'Move-ClaudeSession','Remove-ClaudeProfile','Test-ClaudeProfiles') {
+            if (-not (Get-Command $c -ErrorAction SilentlyContinue)) { throw "missing: $c" }
+            Write-Host "ok  $c"
+          }
+      - name: Core runs on Windows
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests
