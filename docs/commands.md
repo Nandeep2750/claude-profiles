@@ -79,27 +79,48 @@ through its week.
 | `--dirs` | also show each profile's config directory |
 | `--no-usage` | hide the usage columns |
 | `--plain` | no borders - easier to pipe into `awk`, `grep` or a script |
+| `--live` | fetch current figures from the API instead of using the cache |
 
-### Usage figures are cached, not live
+### Live figures
+
+```sh
+claude-profiles --live
+```
+
+Fetches each signed-in profile's current usage directly, in parallel, and shows
+`live` in the `AS OF` column. This costs **no model tokens** - it reads a usage
+endpoint, it does not run a prompt.
+
+Any profile whose fetch fails silently falls back to its cached snapshot, marked
+`(cached)`, so the table always renders. A note below the table says whether any
+profile fell back.
+
+!!! note "What this sends, and where"
+    `--live` reads that profile's OAuth token from your Keychain (macOS) or its
+    `.credentials.json` (elsewhere) and sends it to `api.anthropic.com` - the
+    same host Claude Code already authenticates against. Nothing is sent
+    anywhere else, and nothing is written to disk.
+
+!!! warning "Unofficial endpoint"
+    The usage endpoint is internal to Claude Code and is not a documented public
+    API. It may change or disappear in any release, which is why the cache
+    remains the default and `--live` degrades to it rather than failing.
+
+### Why the cache is stale
+
+
 
 !!! warning "Read the AS OF column"
-    Claude Code writes usage data to a profile's config only when **that
-    profile runs**. A profile you have not used today shows figures from
-    whenever you last used it, and a profile that has never run shows
-    `never used`.
+    Without `--live`, figures come from a cache Claude Code writes only when
+    **that profile runs**, and it refuses to refetch more than once every five
+    minutes. A profile you have not used today shows figures from whenever you
+    last used it; one that has never run shows `never used`.
 
 The `AS OF` value turns amber once the snapshot is more than a day old.
 
-To refresh a profile's figures, start a session under it:
-
-```sh
-claude-profile work
-claude       # any session refreshes the cache on startup
-```
-
-There is deliberately no `--refresh` flag. Refreshing requires authenticating as
-that account, and doing it for every profile on every listing would burn quota
-to answer a question about quota.
+The cache stays the default because it is instant and needs no network. Reach
+for `--live` when the numbers actually matter - deciding which account to start
+a long session on, for instance.
 
 Two accounts showing `ok` at once is normal and expected - that is the whole
 point. See [How it works](how-it-works.md) for where credentials live per OS.

@@ -12,7 +12,8 @@ slot from that path, so profiles stay logged in simultaneously:
 
 Subcommands: path | status | sessions | handoff | remove
 """
-import argparse, datetime, hashlib, json, os, re, shutil, subprocess, sys, textwrap, time
+import argparse, concurrent.futures, datetime, hashlib, json, os, re, shutil, subprocess, sys, textwrap, time
+import urllib.error, urllib.request
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -103,6 +104,79 @@ def usage_of(pdir):
                       "resets": v.get("resets_at"),
                       "locked": v.get("locked_reason")}
     return out
+
+
+USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+
+
+def access_token(pdir):
+    """This profile's OAuth access token, from whichever backend holds it."""
+    blob = None
+    f = os.path.join(pdir, ".credentials.json")
+    if os.path.isfile(f):
+        try:
+            blob = json.load(open(f))
+        except Exception:
+            blob = None
+    if blob is None and IS_MAC:
+        try:
+            r = subprocess.run(["security", "find-generic-password", "-a",
+                                os.environ.get("USER", ""), "-w",
+                                "-s", keychain_service(pdir)],
+                               capture_output=True, text=True, timeout=10)
+            if r.returncode == 0 and r.stdout.strip():
+                blob = json.loads(r.stdout.strip())
+        except Exception:
+            return None
+    if not isinstance(blob, dict):
+        return None
+    return (blob.get("claudeAiOauth") or {}).get("accessToken")
+
+
+def _buckets(obj):
+    """Pull five_hour / seven_day out of a usage payload, shape-tolerantly."""
+    u = obj.get("utilization") if isinstance(obj.get("utilization"), dict) else obj
+    out = {}
+    if isinstance(u, dict):
+        for key, short in (("five_hour", "5h"), ("seven_day", "7d")):
+            v = u.get(key)
+            out[short] = ({"pct": v.get("utilization"), "resets": v.get("resets_at"),
+                           "locked": v.get("locked_reason")}
+                          if isinstance(v, dict) else None)
+    # fall back to the flat `limits` list if the named keys are absent
+    if not any(out.get(k) for k in ("5h", "7d")):
+        for lim in (u.get("limits") if isinstance(u, dict) else None) or []:
+            if not isinstance(lim, dict):
+                continue
+            g = str(lim.get("group") or lim.get("kind") or "").lower()
+            short = "5h" if g in ("session", "five_hour") else ("7d" if "week" in g or "seven" in g else None)
+            if short and not out.get(short):
+                out[short] = {"pct": lim.get("percent"), "resets": lim.get("resets_at"),
+                              "locked": lim.get("locked_reason")}
+    return out
+
+
+def fetch_live(pdir, timeout=6):
+    """Live usage straight from the API, or None. Never raises."""
+    token = access_token(pdir)
+    if not token:
+        return None
+    req = urllib.request.Request(USAGE_URL, headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "User-Agent": "claude-profiles",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            payload = json.loads(r.read().decode())
+    except Exception:
+        return None
+    b = _buckets(payload if isinstance(payload, dict) else {})
+    if not any(b.get(k) for k in ("5h", "7d")):
+        return None
+    b["age"] = 0.0
+    b["live"] = True
+    return b
 
 
 def until(iso):
@@ -274,8 +348,18 @@ def cmd_status(a):
         tone = "rd" if pct >= 90 else ("yl" if pct >= 75 else "gr")
         return C(f"{pct}%", tone), until(bucket["resets"])
 
+    names = profile_names()
+    live = {}
+    if a.live and not a.no_usage:
+        targets = [n for n in names if has_credentials(profile_dir(n))]
+        if targets:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+                futs = {ex.submit(fetch_live, profile_dir(n)): n for n in targets}
+                for f in concurrent.futures.as_completed(futs):
+                    live[futs[f]] = f.result()
+
     rows = []
-    for n in profile_names():
+    for n in names:
         d = profile_dir(n)
         email = account_email(d) or D("(not logged in)")
         authed = has_credentials(d)
@@ -285,19 +369,31 @@ def cmd_status(a):
         if a.dirs:
             row.insert(1, d.replace(HOME, "~"))
         if not a.no_usage:
-            u = usage_of(d)
+            u = live.get(n) or usage_of(d)
             if not u:
                 row += [D("-"), D("-"), D("-"), D("-"), D("never used")]
             else:
                 p5, r5 = cells(u.get("5h"))
                 p7, r7 = cells(u.get("7d"))
-                stale = u["age"] > 86400
-                row += [p5, r5, p7, r7, C(ago(u["age"]), "yl" if stale else "dim")]
+                if u.get("live"):
+                    when = C("live", "gr")
+                elif a.live:
+                    when = C(f"{ago(u['age'])} (cached)", "yl")
+                else:
+                    when = C(ago(u["age"]), "yl" if u["age"] > 86400 else "dim")
+                row += [p5, r5, p7, r7, when]
         rows.append(row)
 
     print(render_table(headers, rows, aligns, plain=a.plain, dim=D))
     if not a.no_usage:
-        print(D("usage is a cached snapshot - it refreshes only when that profile runs claude"))
+        if a.live:
+            if any(v for v in live.values()):
+                print(D("live figures fetched from the Anthropic usage API"))
+            if any(v is None for v in live.values()):
+                print(D("some profiles fell back to their cached snapshot"))
+        else:
+            print(D("cached snapshot - refreshes at most every 5 min while a profile runs."
+                    " use --live for current figures"))
     return 0
 
 
@@ -521,6 +617,8 @@ def main():
     p.add_argument("--dirs", action="store_true", help="show each profile's config dir")
     p.add_argument("--no-usage", action="store_true", help="hide the usage columns")
     p.add_argument("--plain", action="store_true", help="no borders - easier to pipe into other tools")
+    p.add_argument("--live", action="store_true",
+                   help="fetch current usage from the API instead of the cache")
     p.set_defaults(fn=cmd_status)
 
     p = sub.add_parser("sessions", help="list sessions readably")

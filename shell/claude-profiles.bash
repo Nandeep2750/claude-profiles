@@ -59,4 +59,5 @@ _claude_profile_complete() {
 complete -F _claude_profile_complete claude-profile
 complete -F _claude_profile_complete claude-profile-remove
 complete -F _claude_profile_complete claude-handoff
-complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir" claude-sessions
+complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir --plain" claude-sessions
+complete -W "--live --dirs --no-usage --plain" claude-profiles

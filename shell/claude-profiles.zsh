@@ -65,7 +65,6 @@ _claude_profile_names() {
   _describe -t profiles 'claude profile' names
 }
 compdef _claude_profile_names claude-profile
-compdef _claude_profile_names claude-profile-remove
 
 _claude_handoff() {
   case $CURRENT in
@@ -87,3 +86,17 @@ _claude_sessions() {
     '(-d --dir)'{-d,--dir}'[directory to filter on]:dir:_files -/'
 }
 compdef _claude_sessions claude-sessions
+
+_claude_profiles() {
+  _arguments \
+    '--live[fetch current usage from the API instead of the cache]' \
+    '--dirs[show each profile'"'"'s config dir]' \
+    '--no-usage[hide the usage columns]' \
+    '--plain[no borders - easier to pipe]'
+}
+compdef _claude_profiles claude-profiles
+
+_claude_profile_remove() {
+  _arguments '1:profile:_claude_profile_names' '(-y --yes)'{-y,--yes}'[skip confirmation]'
+}
+compdef _claude_profile_remove claude-profile-remove
