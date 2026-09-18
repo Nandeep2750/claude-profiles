@@ -28,7 +28,29 @@ function Get-ClaudeProfiles { & $script:Py $script:Core status @args }
 function Get-ClaudeSessions { & $script:Py $script:Core sessions @args }
 function Move-ClaudeSession { & $script:Py $script:Core handoff  @args }
 
-function Test-ClaudeProfiles { & $script:Py $script:Core doctor @args }
+function Test-ClaudeProfiles  { & $script:Py $script:Core doctor @args }
+function Copy-ClaudeProfile   { & $script:Py $script:Core clone  @args }
+
+function Invoke-ClaudeProfile {
+    [CmdletBinding()] param(
+        [Parameter(Position=0,Mandatory)][string]$Name,
+        [Parameter(Position=1,ValueFromRemainingArguments,Mandatory)][string[]]$Command)
+    $prevDir  = $env:CLAUDE_CONFIG_DIR
+    $prevName = $env:CLAUDE_PROFILE_NAME
+    try {
+        if ($Name -eq "default") {
+            Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue
+        } else {
+            $dir = Join-Path $script:ProfileHome $Name
+            if (-not (Test-Path $dir)) { Write-Error "no such profile: $Name"; return }
+            $env:CLAUDE_CONFIG_DIR = $dir; $env:CLAUDE_PROFILE_NAME = $Name
+        }
+        & $Command[0] @($Command[1..($Command.Count-1)])
+    } finally {
+        if ($prevDir)  { $env:CLAUDE_CONFIG_DIR = $prevDir }   else { Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue }
+        if ($prevName) { $env:CLAUDE_PROFILE_NAME = $prevName } else { Remove-Item Env:CLAUDE_PROFILE_NAME -ErrorAction SilentlyContinue }
+    }
+}
 
 function Remove-ClaudeProfile {
     [CmdletBinding()] param([Parameter(Position=0,Mandatory)][string]$Name,[switch]$Yes)
@@ -47,7 +69,7 @@ function Update-ClaudeProfileFromPath {
         if ($parent -eq $dir) { break }
         $dir = $parent
     }
-    if (-not $name) { $name = "default" }
+    if (-not $name) { $name = if ($env:CLAUDE_DEFAULT_PROFILE) { $env:CLAUDE_DEFAULT_PROFILE } else { "default" } }
     Set-ClaudeProfile $name
 }
 
@@ -57,6 +79,8 @@ Set-Alias claude-sessions Get-ClaudeSessions
 Set-Alias claude-handoff  Move-ClaudeSession
 Set-Alias claude-profile-remove Remove-ClaudeProfile
 Set-Alias claude-doctor   Test-ClaudeProfiles
+Set-Alias claude-profile-clone Copy-ClaudeProfile
+Set-Alias claude-profile-exec  Invoke-ClaudeProfile
 
 Register-ArgumentCompleter -CommandName Set-ClaudeProfile -ParameterName Name -ScriptBlock {
     param($c,$p,$word)

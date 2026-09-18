@@ -50,6 +50,7 @@ nav:
       - Session handoff: guides/handoff.md
   - Reference:
       - Commands: commands.md
+      - Settings: settings.md
       - What's shared, what isn't: isolation.md
       - How it works: how-it-works.md
   - Troubleshooting: troubleshooting.md

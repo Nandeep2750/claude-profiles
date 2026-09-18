@@ -90,6 +90,8 @@ cached value rather than breaking the table.
 | `claude-sessions` | List this directory's conversations, readably |
 | `claude-handoff NAME` | Copy this directory's latest conversation to another account |
 | `claude-profile-remove NAME` | Delete a profile, its conversations and its credentials |
+| `claude-profile-exec NAME CMD` | Run one command under a profile without switching |
+| `claude-profile-clone SRC DST` | Seed a profile's settings from another one |
 | `claude-doctor` | Check the installation for problems |
 | `claude-profiles --live` | Current usage instead of the cached snapshot |
 
@@ -161,6 +163,18 @@ and conversation history are all per-profile, and nothing is inherited from
 > On macOS a profile's Keychain entry is keyed to its **absolute path**. Moving
 > or renaming a profile directory after logging in invalidates its credentials.
 
+## Settings
+
+Set these before the `source` line in your rc file:
+
+| Variable | Effect |
+|---|---|
+| `CLAUDE_DEFAULT_PROFILE` | where unmarked directories fall back to (default: `default`) |
+| `CLAUDE_PROFILE_PROMPT=1` | show the active profile in your prompt |
+| `CLAUDE_PROFILE_HOME` | where account data lives (default: `~/.claude-profiles`) |
+
+[All settings →](https://nandeep2750.github.io/claude-profiles/settings/)
+
 ## Requirements
 
 `python3`, [Claude Code](https://claude.com/claude-code), and zsh, bash or
@@ -172,7 +186,9 @@ PowerShell.
 - **[Commands](https://nandeep2750.github.io/claude-profiles/commands/)** — every command and flag
 - **[What's shared, what isn't](https://nandeep2750.github.io/claude-profiles/isolation/)** — profile isolation, and the one exception
 - **[How it works](https://nandeep2750.github.io/claude-profiles/how-it-works/)** — mechanism and storage layout
+- **[Settings](https://nandeep2750.github.io/claude-profiles/settings/)** — environment variables
 - **[Troubleshooting](https://nandeep2750.github.io/claude-profiles/troubleshooting/)** — common problems and fixes
+- **[Changelog](CHANGELOG.md)** — what changed, and when
 
 ## Contributing
 

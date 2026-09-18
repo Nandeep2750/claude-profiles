@@ -325,6 +325,54 @@ class TestRemove(Fixture):
         self.assertTrue(os.path.isdir(os.path.join(self.ph, "work")))
 
 
+class TestClone(Fixture):
+    def setUp(self):
+        super().setUp()
+        with open(os.path.join(self.ph, "work", "settings.json"), "w") as fh:
+            fh.write('{"theme":"dark"}')
+        os.makedirs(os.path.join(self.ph, "work", "plugins", "thing"), exist_ok=True)
+        os.makedirs(os.path.join(self.ph, "work", "projects", "junk"), exist_ok=True)
+
+    def test_copies_settings_and_plugins(self):
+        code, _, _ = self.run_cmd("clone", "work", "empty")
+        self.assertEqual(code, 0)
+        self.assertTrue(os.path.isfile(os.path.join(self.ph, "empty", "settings.json")))
+        self.assertTrue(os.path.isdir(os.path.join(self.ph, "empty", "plugins", "thing")))
+
+    def test_never_copies_credentials(self):
+        self.run_cmd("clone", "work", "empty")
+        self.assertFalse(os.path.exists(os.path.join(self.ph, "empty", ".credentials.json")))
+
+    def test_never_copies_history(self):
+        self.run_cmd("clone", "work", "empty")
+        self.assertFalse(os.path.exists(os.path.join(self.ph, "empty", "projects")))
+
+    def test_refuses_to_clone_over_default(self):
+        code, _, err = self.run_cmd("clone", "work", "default")
+        self.assertEqual(code, 1)
+        self.assertIn("refusing", err)
+
+    def test_existing_files_are_left_alone_without_force(self):
+        os.makedirs(os.path.join(self.ph, "empty"), exist_ok=True)
+        with open(os.path.join(self.ph, "empty", "settings.json"), "w") as fh:
+            fh.write("MINE")
+        self.run_cmd("clone", "work", "empty")
+        with open(os.path.join(self.ph, "empty", "settings.json")) as fh:
+            self.assertEqual(fh.read(), "MINE")
+
+    def test_force_overwrites(self):
+        with open(os.path.join(self.ph, "empty", "settings.json"), "w") as fh:
+            fh.write("MINE")
+        self.run_cmd("clone", "work", "empty", "--force")
+        with open(os.path.join(self.ph, "empty", "settings.json")) as fh:
+            self.assertIn("dark", fh.read())
+
+    def test_unknown_source_is_refused(self):
+        code, _, err = self.run_cmd("clone", "nosuch", "empty")
+        self.assertEqual(code, 1)
+        self.assertIn("no such profile", err)
+
+
 class TestStatusOutput(Fixture):
     def test_shows_every_profile_and_its_account(self):
         code, out, _ = self.run_cmd("status", "--plain")

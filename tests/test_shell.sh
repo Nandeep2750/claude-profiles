@@ -26,7 +26,9 @@ printf 'shell layer (%s)\n' "$SH_NAME"
 # shellcheck disable=SC1090
 . "$LAYER"
 
-for fn in claude-profile claude-profiles claude-sessions claude-handoff claude-profile-remove claude-doctor; do
+for fn in claude-profile claude-profiles claude-sessions claude-handoff \
+          claude-profile-remove claude-doctor claude-profile-exec \
+          claude-profile-clone claude_profile_prompt; do
   if command -v "$fn" >/dev/null 2>&1; then ok "$fn is defined"; else bad "$fn is defined" "defined" "missing"; fi
 done
 
@@ -57,6 +59,49 @@ is "nearest marker wins over an ancestor" "solo" "${CLAUDE_PROFILE_NAME:-}"
 cd "$HOME/projects/other" || exit 1
 _claude_profile_last_pwd=force; _claude_profile_auto
 is "no marker falls back to default" "" "${CLAUDE_PROFILE_NAME:-}"
+
+# CLAUDE_DEFAULT_PROFILE changes where unmarked directories land
+mkdir -p "$CLAUDE_PROFILE_HOME/fallback"
+CLAUDE_DEFAULT_PROFILE=fallback
+cd "$HOME/projects/other" || exit 1
+_claude_profile_last_pwd=force; _claude_profile_auto
+is "CLAUDE_DEFAULT_PROFILE is used when no marker" "fallback" "${CLAUDE_PROFILE_NAME:-}"
+unset CLAUDE_DEFAULT_PROFILE
+claude-profile default >/dev/null
+
+# a marker still wins over the configured default
+CLAUDE_DEFAULT_PROFILE=fallback
+cd "$HOME/projects/acme" || exit 1
+_claude_profile_last_pwd=force; _claude_profile_auto
+is "a marker beats CLAUDE_DEFAULT_PROFILE" "work" "${CLAUDE_PROFILE_NAME:-}"
+unset CLAUDE_DEFAULT_PROFILE
+claude-profile default >/dev/null
+
+# exec runs under a profile without changing this shell
+OUT=$(claude-profile-exec work sh -c 'printf %s "$CLAUDE_CONFIG_DIR"')
+is "exec sets CLAUDE_CONFIG_DIR for the child" "$CLAUDE_PROFILE_HOME/work" "$OUT"
+is "exec leaves this shell alone" "" "${CLAUDE_PROFILE_NAME:-}"
+claude-profile-exec nosuchprofile true >/dev/null 2>&1 \
+  && bad "exec rejects unknown profiles" "non-zero" "zero" || ok "exec rejects unknown profiles"
+claude-profile-exec work >/dev/null 2>&1 \
+  && bad "exec needs a command" "non-zero" "zero" || ok "exec needs a command"
+
+# prompt indicator
+claude-profile work >/dev/null
+has "prompt indicator names the profile" "$(claude_profile_prompt)" "work"
+claude-profile default >/dev/null
+is "prompt indicator is silent on default" "" "$(claude_profile_prompt)"
+
+# clone copies settings but never credentials
+printf '{"x":1}' > "$CLAUDE_PROFILE_HOME/work/settings.json"
+printf 'secret'  > "$CLAUDE_PROFILE_HOME/work/.credentials.json"
+mkdir -p "$CLAUDE_PROFILE_HOME/fresh"
+claude-profile-clone work fresh >/dev/null 2>&1
+[ -f "$CLAUDE_PROFILE_HOME/fresh/settings.json" ] && ok "clone copies settings.json" \
+  || bad "clone copies settings.json" "copied" "missing"
+[ -f "$CLAUDE_PROFILE_HOME/fresh/.credentials.json" ] \
+  && bad "clone never copies credentials" "absent" "PRESENT" \
+  || ok "clone never copies credentials"
 
 # the core is reachable through the wrappers
 OUT=$(claude-profiles --plain --no-usage 2>&1)

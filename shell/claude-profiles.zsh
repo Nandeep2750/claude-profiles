@@ -27,6 +27,24 @@ claude-profiles() {
   esac
 }
 claude-doctor()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" doctor "$@" }
+claude-profile-clone() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clone "$@" }
+
+# Run one command under a profile without switching this shell.
+#   claude-profile-exec work claude -p "summarise this repo"
+claude-profile-exec() {
+  local name="$1"
+  if [[ -z "$name" || $# -lt 2 ]]; then
+    print -u2 "usage: claude-profile-exec PROFILE COMMAND [ARGS...]"; return 2
+  fi
+  shift
+  if [[ "$name" == default ]]; then
+    env -u CLAUDE_CONFIG_DIR -u CLAUDE_PROFILE_NAME "$@"
+  else
+    local dir="$CLAUDE_PROFILE_HOME/$name"
+    [[ -d "$dir" ]] || { print -u2 "no such profile: $name"; return 1 }
+    CLAUDE_CONFIG_DIR="$dir" CLAUDE_PROFILE_NAME="$name" "$@"
+  fi
+}
 claude-sessions() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" sessions "$@" }
 claude-handoff()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" handoff  "$@" }
 
@@ -51,11 +69,27 @@ _claude_profile_auto() {
     fi
     dir="${dir:h}"
   done
-  claude-profile "${name:-default}"
+  claude-profile "${name:-${CLAUDE_DEFAULT_PROFILE:-default}}"
 }
 autoload -Uz add-zsh-hook
 add-zsh-hook chpwd  _claude_profile_auto
 add-zsh-hook precmd _claude_profile_auto
+
+# Optional prompt indicator. Set CLAUDE_PROFILE_PROMPT=1 before sourcing this
+# file to append the active profile to RPROMPT. claude_profile_prompt is also
+# usable on its own if you build your prompt by hand.
+claude_profile_prompt() {
+  local n="${CLAUDE_PROFILE_NAME:-${CLAUDE_DEFAULT_PROFILE:-default}}"
+  [[ "$n" == "default" && -z "${CLAUDE_PROFILE_SHOW_DEFAULT:-}" ]] && return
+  print -rn -- "${CLAUDE_PROFILE_PROMPT_PREFIX:-claude:}$n"
+}
+if [[ -n "${CLAUDE_PROFILE_PROMPT:-}" ]]; then
+  setopt prompt_subst
+  case "$RPROMPT" in
+    *claude_profile_prompt*) ;;
+    *) RPROMPT='%F{242}$(claude_profile_prompt)%f'"${RPROMPT:-}" ;;
+  esac
+fi
 
 # completion
 if ! whence compdef >/dev/null 2>&1; then
@@ -115,4 +149,7 @@ _claude_profile_remove() {
   _arguments '1:profile:_claude_profile_names' '(-y --yes)'{-y,--yes}'[skip confirmation]'
 }
 compdef _claude_profile_remove claude-profile-remove
+compdef _claude_profile_names claude-profile-exec
+_claude_profile_clone() { _arguments '1:source:_claude_profile_names' '2:target:_claude_profile_names' '(-f --force)'{-f,--force}'[overwrite]' }
+compdef _claude_profile_clone claude-profile-clone
 fi   # compdef available

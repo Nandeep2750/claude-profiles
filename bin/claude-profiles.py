@@ -15,6 +15,8 @@ Subcommands: path | status | sessions | handoff | remove
 import argparse, concurrent.futures, datetime, hashlib, json, os, re, shutil, subprocess, sys, textwrap, time
 import urllib.error, urllib.request
 
+__version__ = "1.0.0"
+
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
 DEFAULT_DIR = os.path.join(HOME, ".claude")
@@ -651,6 +653,53 @@ def rc_files():
                                             ".profile", ".zprofile")]
 
 
+# things worth copying into a new profile - never credentials or history
+CLONEABLE = ["settings.json", "CLAUDE.md", "plugins", "skills", "agents", "commands"]
+NEVER_CLONE = {".credentials.json", ".claude.json", "projects", "sessions", "history.jsonl"}
+
+
+def cmd_clone(a):
+    C = color()
+    src, dst = profile_dir(a.source), profile_dir(a.target)
+    if not os.path.isdir(src):
+        print(f"no such profile: {a.source}", file=sys.stderr)
+        return 1
+    if a.target == "default":
+        print("refusing to clone over 'default' - that is your original ~/.claude",
+              file=sys.stderr)
+        return 1
+    if os.path.normpath(src) == os.path.normpath(dst):
+        print("source and target are the same profile", file=sys.stderr)
+        return 1
+    os.makedirs(dst, exist_ok=True)
+
+    copied, skipped = [], []
+    for item in CLONEABLE:
+        s_path, d_path = os.path.join(src, item), os.path.join(dst, item)
+        if not os.path.exists(s_path):
+            continue
+        if os.path.exists(d_path) and not a.force:
+            skipped.append(item)
+            continue
+        if os.path.isdir(s_path):
+            shutil.rmtree(d_path, ignore_errors=True)
+            shutil.copytree(s_path, d_path)
+        else:
+            shutil.copy2(s_path, d_path)
+        copied.append(item)
+
+    if copied:
+        print(f"copied into {C(a.target, 'cy')}: " + ", ".join(copied))
+    if skipped:
+        print(C(f"already present, left alone: {', '.join(skipped)}", "dim"))
+        print(C("pass --force to overwrite", "dim"))
+    if not copied and not skipped:
+        print(f"nothing to copy from {a.source}")
+    print(C("credentials and conversation history are never cloned - "
+            f"run 'claude-profile {a.target}' then /login", "dim"))
+    return 0
+
+
 def cmd_doctor(a):
     C = color()
     issues, warns = [], []
@@ -670,6 +719,11 @@ def cmd_doctor(a):
         ok(f"CLAUDE_CONFIG_DIR -> {cd.replace(HOME, '~')}")
     else:
         ok("CLAUDE_CONFIG_DIR unset (profile 'default')")
+    dflt = os.environ.get("CLAUDE_DEFAULT_PROFILE")
+    if dflt and dflt != "default" and not os.path.isdir(os.path.join(PROF_HOME, dflt)):
+        bad(f"CLAUDE_DEFAULT_PROFILE='{dflt}' is not a profile")
+    elif dflt:
+        ok(f"CLAUDE_DEFAULT_PROFILE -> {dflt}")
     if not os.path.isdir(PROF_HOME):
         warn(f"{PROF_HOME.replace(HOME, '~')} does not exist yet")
     elif os.path.isdir(os.path.join(PROF_HOME, ".git")):
@@ -750,6 +804,8 @@ def cmd_doctor(a):
 
 def main():
     ap = argparse.ArgumentParser(prog="claude-profiles")
+    ap.add_argument("--version", action="version",
+                    version=f"claude-profiles {__version__}")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("path", help="print a profile's config dir")
@@ -772,6 +828,12 @@ def main():
     p.add_argument("-d", "--dir", default=os.getcwd())
     p.add_argument("--plain", action="store_true", help="no borders - easier to pipe")
     p.set_defaults(fn=cmd_sessions)
+
+    p = sub.add_parser("clone", help="copy settings from one profile into another")
+    p.add_argument("source")
+    p.add_argument("target")
+    p.add_argument("-f", "--force", action="store_true", help="overwrite what is already there")
+    p.set_defaults(fn=cmd_clone)
 
     p = sub.add_parser("doctor", help="check the installation for problems")
     p.set_defaults(fn=cmd_doctor)

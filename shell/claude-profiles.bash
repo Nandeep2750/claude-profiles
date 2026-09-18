@@ -27,6 +27,24 @@ claude-profiles() {
   esac
 }
 claude-doctor()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" doctor "$@"; }
+claude-profile-clone() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clone "$@"; }
+
+# Run one command under a profile without switching this shell.
+#   claude-profile-exec work claude -p "summarise this repo"
+claude-profile-exec() {
+  local name="$1"
+  if [ -z "$name" ] || [ "$#" -lt 2 ]; then
+    echo "usage: claude-profile-exec PROFILE COMMAND [ARGS...]" >&2; return 2
+  fi
+  shift
+  if [ "$name" = default ]; then
+    env -u CLAUDE_CONFIG_DIR -u CLAUDE_PROFILE_NAME "$@"
+  else
+    local dir="$CLAUDE_PROFILE_HOME/$name"
+    [ -d "$dir" ] || { echo "no such profile: $name" >&2; return 1; }
+    CLAUDE_CONFIG_DIR="$dir" CLAUDE_PROFILE_NAME="$name" "$@"
+  fi
+}
 claude-sessions() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" sessions "$@"; }
 claude-handoff()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" handoff  "$@"; }
 
@@ -50,13 +68,26 @@ _claude_profile_auto() {
     fi
     dir=$(dirname "$dir")
   done
-  claude-profile "${name:-default}"
+  claude-profile "${name:-${CLAUDE_DEFAULT_PROFILE:-default}}"
 }
 case "${PROMPT_COMMAND:-}" in
   *_claude_profile_auto*) ;;
   "") PROMPT_COMMAND="_claude_profile_auto" ;;
   *)  PROMPT_COMMAND="_claude_profile_auto;$PROMPT_COMMAND" ;;
 esac
+
+# Optional prompt indicator - set CLAUDE_PROFILE_PROMPT=1 before sourcing.
+claude_profile_prompt() {
+  local n="${CLAUDE_PROFILE_NAME:-${CLAUDE_DEFAULT_PROFILE:-default}}"
+  if [ "$n" = "default" ] && [ -z "${CLAUDE_PROFILE_SHOW_DEFAULT:-}" ]; then return; fi
+  printf '%s%s' "${CLAUDE_PROFILE_PROMPT_PREFIX:-claude:}" "$n"
+}
+if [ -n "${CLAUDE_PROFILE_PROMPT:-}" ]; then
+  case "${PS1:-}" in
+    *claude_profile_prompt*) ;;
+    *) PS1='$(claude_profile_prompt) '"${PS1:-}" ;;
+  esac
+fi
 
 _claude_profile_complete() {
   local names
@@ -65,6 +96,8 @@ _claude_profile_complete() {
 }
 complete -F _claude_profile_complete claude-profile
 complete -F _claude_profile_complete claude-profile-remove
+complete -F _claude_profile_complete claude-profile-exec
+complete -F _claude_profile_complete claude-profile-clone
 complete -F _claude_profile_complete claude-handoff
 complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir --plain" claude-sessions
 complete -W "status doctor sessions handoff remove path --live --dirs --no-usage --plain" claude-profiles

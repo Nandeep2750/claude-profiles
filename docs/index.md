@@ -106,6 +106,8 @@ see [How it works](how-it-works.md) for the details.
 | `claude-sessions` | List this directory's conversations, readably |
 | `claude-handoff NAME` | Copy this directory's latest conversation to profile `NAME` |
 | `claude-profile-remove NAME` | Delete a profile, its conversations and its credentials |
+| `claude-profile-exec NAME CMD` | Run one command under a profile without switching |
+| `claude-profile-clone SRC DST` | Seed a profile's settings from another one |
 | `claude-doctor` | Check the installation for problems |
 | `claude-profiles --live` | Current usage figures instead of the cached snapshot |
 

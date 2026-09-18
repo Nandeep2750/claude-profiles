@@ -11,11 +11,15 @@ scripts, or on a shell with no wrapper installed.
 | `claude-sessions` | `claude-profiles.py sessions` |
 | `claude-handoff` | `claude-profiles.py handoff` |
 | `claude-profile-remove` | `claude-profiles.py remove` |
+| `claude-profile-clone` | `claude-profiles.py clone` |
+| `claude-profile-exec` | *(shell only)* |
+| `claude-doctor` | `claude-profiles.py doctor` |
 | - | `claude-profiles.py path NAME` |
 
 PowerShell users get the same names as aliases, plus verb-noun forms
 (`Set-ClaudeProfile`, `Get-ClaudeProfiles`, `Get-ClaudeSessions`,
-`Move-ClaudeSession`, `Remove-ClaudeProfile`).
+`Move-ClaudeSession`, `Remove-ClaudeProfile`, `Test-ClaudeProfiles`,
+`Copy-ClaudeProfile`, `Invoke-ClaudeProfile`).
 
 ---
 
@@ -290,6 +294,50 @@ refuses unknown names, listing what is available instead.
     Every conversation in that profile is deleted with it. If you want to keep
     one, [hand it off](guides/handoff.md) to another profile first:
     `claude-handoff default <session-id>`.
+
+---
+
+## `claude-profile-exec PROFILE COMMAND [ARGS...]`
+
+Run a single command under a profile without switching your shell.
+
+```sh
+claude-profile-exec work claude -p "summarise this repo"
+claude-profile-exec client claude mcp list
+```
+
+The profile applies only to that command. Your shell's own profile is unchanged,
+so this is the right tool for scripts, cron jobs, and one-off checks against
+another account.
+
+Exits 2 with a usage message if you omit the command, and 1 if the profile does
+not exist.
+
+---
+
+## `claude-profile-clone SOURCE TARGET`
+
+Copy configuration from one profile into another, so a new profile does not
+start from nothing.
+
+```sh
+claude-profile-clone default work
+claude-profile-clone default work --force    # overwrite what is already there
+```
+
+| Copied | Never copied |
+|---|---|
+| `settings.json`, `CLAUDE.md` | `.credentials.json` - belongs to one account |
+| `plugins/`, `skills/`, `agents/`, `commands/` | `.claude.json` - account identity and per-project state |
+| | `projects/`, `sessions/`, `history.jsonl` - conversation history |
+
+Anything already present in the target is left alone unless you pass `--force`,
+and the command tells you what it skipped.
+
+!!! note "Global MCP servers are not cloned"
+    They live in `.claude.json` alongside account identity, so copying that file
+    would carry the wrong account with it. Re-add them under the new profile:
+    `claude-profile work && claude mcp add ...`
 
 ---
 
