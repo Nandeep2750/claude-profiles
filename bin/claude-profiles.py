@@ -346,7 +346,9 @@ def cmd_status(a):
             return C("locked", "rd"), D("-")
         pct = bucket["pct"]
         tone = "rd" if pct >= 90 else ("yl" if pct >= 75 else "gr")
-        return C(f"{pct}%", tone), until(bucket["resets"])
+        # the API returns floats, the cache ints - render both the same way
+        shown = f"{pct:g}" if isinstance(pct, float) else str(pct)
+        return C(f"{shown}%", tone), until(bucket["resets"])
 
     names = profile_names()
     live = {}
