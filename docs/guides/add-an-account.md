@@ -68,7 +68,10 @@ CLAUDE_CONFIG_DIR=$(claude-profiles.py path work) claude -p "summarise this repo
 ## Remove an account
 
 ```sh
-rm -rf ~/.claude-profiles/work
+claude-profile-remove work
 ```
 
-That logs out only that account and removes it from the listing.
+That deletes the profile, its conversations and its stored credentials, after
+asking you to confirm. Use it rather than `rm -rf` - on macOS the credentials
+live in the Keychain, and deleting the directory by hand leaves an orphaned
+entry behind.

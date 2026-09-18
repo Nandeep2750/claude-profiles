@@ -10,11 +10,12 @@ scripts, or on a shell with no wrapper installed.
 | `claude-profiles` | `claude-profiles.py status` |
 | `claude-sessions` | `claude-profiles.py sessions` |
 | `claude-handoff` | `claude-profiles.py handoff` |
+| `claude-profile-remove` | `claude-profiles.py remove` |
 | - | `claude-profiles.py path NAME` |
 
 PowerShell users get the same names as aliases, plus verb-noun forms
 (`Set-ClaudeProfile`, `Get-ClaudeProfiles`, `Get-ClaudeSessions`,
-`Move-ClaudeSession`).
+`Move-ClaudeSession`, `Remove-ClaudeProfile`).
 
 ---
 
@@ -133,6 +134,48 @@ profile onto itself, or into a profile that does not exist, is refused with a
 message rather than silently doing nothing.
 
 It is a copy - the source profile keeps its version, so you can switch back.
+
+---
+
+## `claude-profile-remove NAME`
+
+Delete a profile: its directory, its conversations, and its stored credentials.
+
+```sh
+claude-profile-remove client
+```
+
+It shows what will be destroyed and asks you to type the profile name to
+confirm:
+
+```
+about to permanently delete profile client
+  directory : ~/.claude-profiles/client  (12.4MB)
+  account   : you@company.com
+  sessions  : 37 conversation(s) - deleted with it
+  keychain  : Claude Code-credentials-fd54d734
+
+type the profile name to confirm:
+```
+
+| Flag | Effect |
+|---|---|
+| `-y`, `--yes` | skip the confirmation prompt (for scripts) |
+
+**Why not just `rm -rf`?** On macOS, credentials live in the Keychain rather
+than in the profile directory. Deleting the directory by hand leaves an
+orphaned Keychain entry behind. This command removes both.
+
+It also resets your current shell to `default` if you delete the profile you are
+standing in, so you are not left pointing at a directory that no longer exists.
+
+**Guards.** It refuses to delete `default` - your original `~/.claude` - and
+refuses unknown names, listing what is available instead.
+
+!!! danger "This is not recoverable"
+    Every conversation in that profile is deleted with it. If you want to keep
+    one, [hand it off](guides/handoff.md) to another profile first:
+    `claude-handoff default <session-id>`.
 
 ---
 

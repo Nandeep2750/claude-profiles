@@ -23,6 +23,15 @@ claude-profiles() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@" }
 claude-sessions() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" sessions "$@" }
 claude-handoff()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" handoff  "$@" }
 
+# Delete a profile. Resets this shell to `default` if it removed the active one.
+claude-profile-remove() {
+  local name="$1"
+  "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" remove "$@" || return $?
+  [[ "$name" == "${CLAUDE_PROFILE_NAME:-default}" ]] && claude-profile default
+  _claude_profile_last_pwd="__unset__"   # let the cd hook re-resolve
+  return 0
+}
+
 # auto-switch on cd: nearest .claude-profile file walking up from $PWD
 _claude_profile_last_pwd="__unset__"
 _claude_profile_auto() {
@@ -56,6 +65,7 @@ _claude_profile_names() {
   _describe -t profiles 'claude profile' names
 }
 compdef _claude_profile_names claude-profile
+compdef _claude_profile_names claude-profile-remove
 
 _claude_handoff() {
   case $CURRENT in

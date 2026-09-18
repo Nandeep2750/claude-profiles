@@ -23,6 +23,15 @@ claude-profiles() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@"; }
 claude-sessions() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" sessions "$@"; }
 claude-handoff()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" handoff  "$@"; }
 
+# Delete a profile. Resets this shell to `default` if it removed the active one.
+claude-profile-remove() {
+  local name="$1"
+  "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" remove "$@" || return $?
+  [ "$name" = "${CLAUDE_PROFILE_NAME:-default}" ] && claude-profile default
+  _claude_profile_last_pwd="__unset__"
+  return 0
+}
+
 _claude_profile_last_pwd="__unset__"
 _claude_profile_auto() {
   [ "$PWD" = "$_claude_profile_last_pwd" ] && return
@@ -48,5 +57,6 @@ _claude_profile_complete() {
   COMPREPLY=( $(compgen -W "$names" -- "${COMP_WORDS[COMP_CWORD]}") )
 }
 complete -F _claude_profile_complete claude-profile
+complete -F _claude_profile_complete claude-profile-remove
 complete -F _claude_profile_complete claude-handoff
 complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir" claude-sessions

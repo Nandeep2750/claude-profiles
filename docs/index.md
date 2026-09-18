@@ -86,6 +86,7 @@ see [How it works](how-it-works.md) for the details.
 | `claude-profile NAME` | Switch to `NAME`, creating it if needed |
 | `claude-sessions` | List this directory's conversations, readably |
 | `claude-handoff NAME` | Copy this directory's latest conversation to profile `NAME` |
+| `claude-profile-remove NAME` | Delete a profile, its conversations and its credentials |
 
 Full flag reference: [Commands](commands.md).
 

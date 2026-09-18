@@ -72,6 +72,7 @@ Two accounts showing `ok` at once is normal — that is the whole point.
 | `claude-profile NAME` | Switch to `NAME`, creating it if needed |
 | `claude-sessions` | List this directory's conversations, readably |
 | `claude-handoff NAME` | Copy this directory's latest conversation to another account |
+| `claude-profile-remove NAME` | Delete a profile, its conversations and its credentials |
 
 Tab completion works on all of them.
 [Full reference →](https://nandeep2750.github.io/claude-profiles/commands/)

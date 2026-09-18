@@ -10,7 +10,7 @@ slot from that path, so profiles stay logged in simultaneously:
   macOS          -> Keychain service "Claude Code-credentials-<sha256(dir)[:8]>"
   Linux/Windows  -> <profile dir>/.credentials.json
 
-Subcommands: path | status | sessions | handoff
+Subcommands: path | status | sessions | handoff | remove
 """
 import argparse, hashlib, json, os, re, shutil, subprocess, sys, textwrap, time
 
@@ -283,6 +283,76 @@ def cmd_handoff(a):
     return 0
 
 
+def dir_size(path):
+    total = 0
+    for dirpath, _, files in os.walk(path):
+        for f in files:
+            try:
+                total += os.path.getsize(os.path.join(dirpath, f))
+            except OSError:
+                pass
+    return total
+
+
+def human(n):
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.0f}{unit}" if unit == "B" else f"{n/1:.1f}{unit}"
+        n /= 1024
+    return f"{n:.1f}GB"
+
+
+def cmd_remove(a):
+    C = color()
+    name = a.name
+    if name == "default":
+        print("refusing to remove 'default' - that is your original ~/.claude", file=sys.stderr)
+        return 1
+    pdir = profile_dir(name)
+    if not os.path.isdir(pdir):
+        print(f"no such profile: {name}", file=sys.stderr)
+        print("available: " + ", ".join(profile_names()), file=sys.stderr)
+        return 1
+
+    email = account_email(pdir)
+    n_sessions = sum(1 for _ in transcripts(name))
+    size = human(dir_size(pdir))
+    service = keychain_service(pdir) if IS_MAC else None
+
+    print(f"about to permanently delete profile {C(name, 'yl')}")
+    print(f"  directory : {pdir.replace(HOME, '~')}  ({size})")
+    print(f"  account   : {email or '(not logged in)'}")
+    print(f"  sessions  : {n_sessions} conversation(s) - deleted with it")
+    if service and has_credentials(pdir):
+        print(f"  keychain  : {service}")
+    if name == active_profile():
+        print(C("  note      : this is the profile active in your shell", "yl"))
+
+    if not a.yes:
+        try:
+            if input("\ntype the profile name to confirm: ").strip() != name:
+                print("aborted"); return 1
+        except (EOFError, KeyboardInterrupt):
+            print("\naborted"); return 1
+
+    if service:
+        try:
+            subprocess.run(["security", "delete-generic-password",
+                            "-a", os.environ.get("USER", ""), "-s", service],
+                           capture_output=True, timeout=10)
+        except Exception:
+            pass
+    shutil.rmtree(pdir, ignore_errors=True)
+
+    if os.path.exists(pdir):
+        print(f"could not fully remove {pdir}", file=sys.stderr)
+        return 1
+    print(f"removed profile {name}")
+    if name == active_profile():
+        print("  run 'claude-profile default' to leave the removed profile")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(prog="claude-profiles")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -301,6 +371,11 @@ def main():
     p.add_argument("-f", "--full", action="store_true")
     p.add_argument("-d", "--dir", default=os.getcwd())
     p.set_defaults(fn=cmd_sessions)
+
+    p = sub.add_parser("remove", help="delete a profile and its credentials")
+    p.add_argument("name")
+    p.add_argument("-y", "--yes", action="store_true", help="skip confirmation")
+    p.set_defaults(fn=cmd_remove)
 
     p = sub.add_parser("handoff", help="copy a session into another profile")
     p.add_argument("target")

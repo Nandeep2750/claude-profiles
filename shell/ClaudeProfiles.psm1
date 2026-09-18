@@ -28,6 +28,13 @@ function Get-ClaudeProfiles { & $script:Py $script:Core status @args }
 function Get-ClaudeSessions { & $script:Py $script:Core sessions @args }
 function Move-ClaudeSession { & $script:Py $script:Core handoff  @args }
 
+function Remove-ClaudeProfile {
+    [CmdletBinding()] param([Parameter(Position=0,Mandatory)][string]$Name,[switch]$Yes)
+    $extra = if ($Yes) { @("--yes") } else { @() }
+    & $script:Py $script:Core remove $Name @extra
+    if ($LASTEXITCODE -eq 0 -and $Name -eq $env:CLAUDE_PROFILE_NAME) { Set-ClaudeProfile "default" }
+}
+
 # auto-switch on directory change
 function Update-ClaudeProfileFromPath {
     $dir = (Get-Location).Path; $name = $null
@@ -46,6 +53,7 @@ Set-Alias claude-profile  Set-ClaudeProfile
 Set-Alias claude-profiles Get-ClaudeProfiles
 Set-Alias claude-sessions Get-ClaudeSessions
 Set-Alias claude-handoff  Move-ClaudeSession
+Set-Alias claude-profile-remove Remove-ClaudeProfile
 
 Register-ArgumentCompleter -CommandName Set-ClaudeProfile -ParameterName Name -ScriptBlock {
     param($c,$p,$word)
