@@ -48,10 +48,13 @@ List every profile, which account is signed into it, whether credentials are
 present, and how much of each account's usage limit is consumed.
 
 ```
-   PROFILE  ACCOUNT              AUTH  5-HOUR             7-DAY              AS OF
-*  default  you@example.com      ok     59%  in 53m        40%  in 4d 23h    1h ago
-   work     you@company.com      ok      3%  in 1h 13m     87%  in 2d 18h    2h ago
-   client   (not logged in)      none  -                  -                  never used
+╭───────────┬─────────────────────┬──────┬────────┬───────────┬───────┬───────────┬────────────╮
+│ PROFILE   │ ACCOUNT             │ AUTH │ 5-HOUR │ RESETS    │ 7-DAY │ RESETS    │      AS OF │
+├───────────┼─────────────────────┼──────┼────────┼───────────┼───────┼───────────┼────────────┤
+│ * default │ you@example.com     │ ok   │    59% │ in 53m    │   40% │ in 4d 23h │     1h ago │
+│   work    │ you@company.com     │ ok   │     3% │ in 1h 13m │   87% │ in 2d 18h │     2h ago │
+│   client  │ (not logged in)     │ none │      - │ -         │     - │ -         │ never used │
+╰───────────┴─────────────────────┴──────┴────────┴───────────┴───────┴───────────┴────────────╯
 ```
 
 | Column | Meaning |
@@ -75,6 +78,7 @@ through its week.
 |---|---|
 | `--dirs` | also show each profile's config directory |
 | `--no-usage` | hide the usage columns |
+| `--plain` | no borders - easier to pipe into `awk`, `grep` or a script |
 
 ### Usage figures are cached, not live
 
@@ -108,10 +112,17 @@ List conversations readably, so you can identify one by what it was about
 rather than by a 36-character id.
 
 ```
-   WHEN      TURNS  SESSION ID                            SUMMARY
- 1 2m ago       18  eb82f424-4aff-43eb-a0e1-f1e130553fc6  how do I set up two accounts…
- 2 Sep 11        2  2c24a68b-8411-4bb6-9072-99b86b5ae909  cant able to take pull
+╭───┬────────┬───────┬──────────────────────────────────────┬──────────────────────────────────╮
+│ # │ WHEN   │ TURNS │ SESSION ID                           │ SUMMARY                          │
+├───┼────────┼───────┼──────────────────────────────────────┼──────────────────────────────────┤
+│ 1 │ 2m ago │    18 │ eb82f424-4aff-43eb-a0e1-f1e130553fc6 │ refactor the auth middleware…    │
+│ 2 │ Sep 11 │     2 │ 2c24a68b-8411-4bb6-9072-99b86b5ae909 │ cant able to take pull           │
+╰───┴────────┴───────┴──────────────────────────────────────┴──────────────────────────────────╯
 ```
+
+The table adapts to your terminal: on a narrow one the `SESSION ID` column
+shortens to an 8-character `ID`, which is still enough for `claude-handoff`
+since it accepts prefixes.
 
 Defaults to the current directory and the active profile, newest first.
 
@@ -123,6 +134,7 @@ Defaults to the current directory and the active profile, newest first.
 | `-n N`, `--limit N` | max rows (default 20). Bare `--limit` means no limit |
 | `-f`, `--full` | wrap long summaries instead of truncating them |
 | `-d DIR`, `--dir DIR` | filter on a directory other than the current one |
+| `--plain` | no borders - easier to pipe into other tools |
 
 ```sh
 claude-sessions                   # this directory, active profile

@@ -195,6 +195,49 @@ def age(ts):
     return time.strftime("%b %d", time.localtime(ts))
 
 
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def vlen(s):
+    """Visible width, ignoring ANSI colour codes."""
+    return len(ANSI_RE.sub("", s))
+
+
+def vpad(s, w, align="l"):
+    d = w - vlen(s)
+    if d <= 0:
+        return s
+    return s + " " * d if align == "l" else " " * d + s
+
+
+def render_table(headers, rows, aligns=None, plain=False, dim=None):
+    """Render a bordered table that stays aligned even with ANSI colours."""
+    aligns = aligns or ["l"] * len(headers)
+    widths = [max(vlen(str(h)), *(vlen(str(r[i])) for r in rows)) if rows
+              else vlen(str(h)) for i, h in enumerate(headers)]
+    D = dim or (lambda s: s)
+
+    if plain:
+        out = ["  ".join(vpad(str(h), widths[i], aligns[i])
+                         for i, h in enumerate(headers)).rstrip()]
+        for r in rows:
+            out.append("  ".join(vpad(str(c), widths[i], aligns[i])
+                                 for i, c in enumerate(r)).rstrip())
+        return "\n".join(out)
+
+    def rule(l, m, r):
+        return D(l + m.join("─" * (w + 2) for w in widths) + r)
+
+    def line(cells):
+        body = D("│") + D("│").join(
+            " " + vpad(str(c), widths[i], aligns[i]) + " " for i, c in enumerate(cells))
+        return body + D("│")
+
+    return "\n".join([rule("╭", "┬", "╮"), line(headers),
+                       rule("├", "┼", "┤")] + [line(r) for r in rows] +
+                      [rule("╰", "┴", "╯")])
+
+
 def color(on=True):
     if not on or not sys.stdout.isatty() or os.environ.get("NO_COLOR"):
         return lambda s, c: s
@@ -210,63 +253,57 @@ def cmd_path(a):
 
 def cmd_status(a):
     C = color()
+    D = lambda t: C(t, "dim")
     act = active_profile()
+
+    headers = ["PROFILE", "ACCOUNT", "AUTH"]
+    aligns  = ["l", "l", "l"]
+    if a.dirs:
+        headers.insert(1, "CONFIG DIR"); aligns.insert(1, "l")
+    if not a.no_usage:
+        headers += ["5-HOUR", "RESETS", "7-DAY", "RESETS", "AS OF"]
+        aligns  += ["r", "l", "r", "l", "r"]
+
+    def cells(bucket):
+        """(percent, resets) cells for one limit."""
+        if not bucket or bucket.get("pct") is None:
+            return D("-"), D("-")
+        if bucket.get("locked"):
+            return C("locked", "rd"), D("-")
+        pct = bucket["pct"]
+        tone = "rd" if pct >= 90 else ("yl" if pct >= 75 else "gr")
+        return C(f"{pct}%", tone), until(bucket["resets"])
+
     rows = []
     for n in profile_names():
         d = profile_dir(n)
-        rows.append({
-            "name": n, "dir": d,
-            "email": account_email(d) or "(not logged in)",
-            "auth": "ok" if has_credentials(d) else "none",
-            "usage": None if a.no_usage else usage_of(d),
-        })
+        email = account_email(d) or D("(not logged in)")
+        authed = has_credentials(d)
+        name = C(f"* {n}", "b") if n == act else f"  {n}"
 
-    wN = max(max(len(r["name"]) for r in rows), 7) + 2
-    wE = max(max(len(r["email"]) for r in rows), 7) + 2
-    wD = max(len(r["dir"].replace(HOME, "~")) for r in rows) + 2 if a.dirs else 0
-
-    head = f"{'':<2}{'PROFILE':<{wN}}"
-    if a.dirs:
-        head += f"{'CONFIG DIR':<{wD}}"
-    head += f"{'ACCOUNT':<{wE}}{'AUTH':<6}"
-    if not a.no_usage:
-        head += f"{'5-HOUR':<19}{'7-DAY':<19}{'AS OF'}"
-    print(C(head.rstrip(), "b"))
-
-    def pct_cell(bucket):
-        if not bucket or bucket.get("pct") is None:
-            return f"{'-':<19}"
-        pct = bucket["pct"]
-        tone = "rd" if pct >= 90 else ("yl" if pct >= 75 else "gr")
-        if bucket.get("locked"):
-            return C(f"{'locked':<18}", "rd")
-        cell = f"{pct}%"
-        return C(f"{cell:>4}", tone) + f"  {until(bucket['resets']):<13}"
-
-    for r in rows:
-        line = f"{'*' if r['name'] == act else ' ':<2}{r['name']:<{wN}}"
+        row = [name, email, C("ok", "gr") if authed else D("none")]
         if a.dirs:
-            line += f"{r['dir'].replace(HOME, '~'):<{wD}}"
-        line += f"{r['email']:<{wE}}"
-        line += (C("ok", "gr") + "    ") if r["auth"] == "ok" else C(f"{'none':<6}", "dim")
-        u = r["usage"]
+            row.insert(1, d.replace(HOME, "~"))
         if not a.no_usage:
+            u = usage_of(d)
             if not u:
-                line += f"{'-':<19}{'-':<19}" + C("never used", "dim")
+                row += [D("-"), D("-"), D("-"), D("-"), D("never used")]
             else:
-                line += pct_cell(u.get("5h")) + pct_cell(u.get("7d"))
+                p5, r5 = cells(u.get("5h"))
+                p7, r7 = cells(u.get("7d"))
                 stale = u["age"] > 86400
-                line += C(ago(u["age"]), "yl" if stale else "dim")
-        print(line.rstrip())
+                row += [p5, r5, p7, r7, C(ago(u["age"]), "yl" if stale else "dim")]
+        rows.append(row)
 
-    if not a.no_usage and any(r["usage"] for r in rows):
-        print()
-        print(C("usage is a cached snapshot - it refreshes only when that profile runs claude", "dim"))
+    print(render_table(headers, rows, aligns, plain=a.plain, dim=D))
+    if not a.no_usage:
+        print(D("usage is a cached snapshot - it refreshes only when that profile runs claude"))
     return 0
 
 
 def cmd_sessions(a):
     C = color()
+    D = lambda t: C(t, "dim")
     if a.profile:
         want = [a.profile]
     elif a.all_profiles:
@@ -275,7 +312,7 @@ def cmd_sessions(a):
         want = [active_profile()]
 
     target = os.path.abspath(a.dir)
-    rows = []
+    found = []
     for p in want:
         for f in transcripts(p):
             info = scan(f)
@@ -284,38 +321,68 @@ def cmd_sessions(a):
             cwd, branch, turns, mtime, summary = info
             if not a.all and cwd != target:
                 continue
-            rows.append((mtime, p, os.path.basename(f)[:-6], cwd or "?", branch, turns, summary))
-    rows.sort(reverse=True)
-    if not rows:
+            found.append((mtime, p, os.path.basename(f)[:-6], cwd or "?", branch, turns, summary))
+    found.sort(reverse=True)
+    if not found:
         where = "any directory" if a.all else target
         print(f"no sessions in profile(s) {', '.join(want)} for {where}", file=sys.stderr)
         print("try:  claude-sessions -a       (all directories)", file=sys.stderr)
         print("      claude-sessions -A -a    (all profiles too)", file=sys.stderr)
         return 1
     if a.limit:
-        rows = rows[:a.limit]
+        found = found[:a.limit]
 
     multi = len(want) > 1
-    width = shutil.get_terminal_size((120, 24)).columns
-    head = f"{'':<3}{'WHEN':<9} {'TURNS':>5}  {'SESSION ID':<36}"
+    headers = ["#", "WHEN", "TURNS", "SESSION ID", "SUMMARY"]
+    aligns  = ["r", "l", "r", "l", "l"]
     if multi:
-        head = f"{'':<3}{'PROFILE':<9}" + head[3:]
-    print(C(head + "  SUMMARY", "b"))
-    fixed = len(head) + 2
-    for i, (mtime, p, sid, cwd, branch, turns, summary) in enumerate(rows, 1):
-        lead = f"{i:>2} " + (f"{p:<9}" if multi else "")
-        lead += f"{age(mtime):<9} {turns:>5}  {C(sid,'cy')}  "
-        room = max(40, min(width - fixed - 3, 100))
-        if a.full and len(summary) > room:
-            wrapped = textwrap.wrap(summary, room) or [summary]
-            print(lead + wrapped[0])
-            for extra in wrapped[1:]:
-                print(f"{'':<{fixed-2}}{extra}")
-        else:
-            print(lead + (summary if len(summary) <= room else summary[:room-1] + "…"))
-        if a.all:
-            tag = cwd.replace(HOME, "~") + (f"  ({branch})" if branch else "")
-            print(C(f"{'':<{fixed-2}}{tag}", "dim"))
+        headers.insert(1, "PROFILE"); aligns.insert(1, "l")
+    if a.all:
+        headers.insert(len(headers) - 1, "DIRECTORY"); aligns.insert(len(aligns) - 1, "l")
+
+    def dircell(cwd, branch):
+        path = cwd.replace(HOME, "~")
+        if len(path) > 32:
+            path = "…" + path[-31:]
+        if branch and branch != "HEAD":
+            b = branch if len(branch) <= 16 else branch[:15] + "…"
+            return path + D(f" ({b})")
+        return path
+
+    # build every cell except SUMMARY, then give SUMMARY whatever is left
+    width = shutil.get_terminal_size((120, 24)).columns
+    n_fixed = len(headers) - 1
+
+    def build(short_id):
+        out = []
+        for i, (mtime, p, sid, cwd, branch, turns, summary) in enumerate(found, 1):
+            shown = sid[:8] if short_id else sid
+            row = [str(i), age(mtime), str(turns), C(shown, "cy")]
+            if multi:
+                row.insert(1, p)
+            if a.all:
+                row.append(dircell(cwd, branch))
+            out.append((row, summary))
+        return out
+
+    def overhead_of(part):
+        w = [max(vlen(headers[i]), *(vlen(r[0][i]) for r in part))
+             for i in range(n_fixed)]
+        return sum(x + 3 for x in w) + 4            # borders and padding
+
+    partial = build(False)
+    if width - overhead_of(partial) < 30:           # too tight - shorten ids
+        partial = build(True)
+        headers[headers.index("SESSION ID")] = "ID"
+    overhead = overhead_of(partial)
+    room = max(20, min(width - overhead, 100))
+
+    rows = []
+    for row, summary in partial:
+        text = summary if a.full or len(summary) <= room else summary[:room - 1] + "…"
+        rows.append(row + [text])
+
+    print(render_table(headers, rows, aligns, plain=a.plain, dim=D))
     return 0
 
 
@@ -453,6 +520,7 @@ def main():
     p = sub.add_parser("status", help="list profiles, accounts and usage")
     p.add_argument("--dirs", action="store_true", help="show each profile's config dir")
     p.add_argument("--no-usage", action="store_true", help="hide the usage columns")
+    p.add_argument("--plain", action="store_true", help="no borders - easier to pipe into other tools")
     p.set_defaults(fn=cmd_status)
 
     p = sub.add_parser("sessions", help="list sessions readably")
@@ -462,6 +530,7 @@ def main():
     p.add_argument("-n", "--limit", type=int, nargs="?", default=20, const=0)
     p.add_argument("-f", "--full", action="store_true")
     p.add_argument("-d", "--dir", default=os.getcwd())
+    p.add_argument("--plain", action="store_true", help="no borders - easier to pipe")
     p.set_defaults(fn=cmd_sessions)
 
     p = sub.add_parser("remove", help="delete a profile and its credentials")
