@@ -6,3 +6,5 @@
 .credentials.json
 .claude.json
 site/
+__pycache__/
+*.pyc
