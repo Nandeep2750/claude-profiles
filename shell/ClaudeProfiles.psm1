@@ -30,6 +30,8 @@ function Move-ClaudeSession { & $script:Py $script:Core handoff  @args }
 
 function Test-ClaudeProfiles  { & $script:Py $script:Core doctor @args }
 function Copy-ClaudeProfile   { & $script:Py $script:Core clone  @args }
+function Clear-ClaudeSessions { & $script:Py $script:Core prune  @args }
+function Find-ClaudeProfile   { & $script:Py $script:Core best   @args }
 
 function Invoke-ClaudeProfile {
     [CmdletBinding()] param(
@@ -81,6 +83,8 @@ Set-Alias claude-profile-remove Remove-ClaudeProfile
 Set-Alias claude-doctor   Test-ClaudeProfiles
 Set-Alias claude-profile-clone Copy-ClaudeProfile
 Set-Alias claude-profile-exec  Invoke-ClaudeProfile
+Set-Alias claude-prune    Clear-ClaudeSessions
+Set-Alias claude-best     Find-ClaudeProfile
 
 Register-ArgumentCompleter -CommandName Set-ClaudeProfile -ParameterName Name -ScriptBlock {
     param($c,$p,$word)

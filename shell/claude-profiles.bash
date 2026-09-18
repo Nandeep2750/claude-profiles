@@ -22,12 +22,23 @@ claude-profile() {
 # `claude-profiles` with no subcommand means `status`; anything else passes through.
 claude-profiles() {
   case "$1" in
-    status|sessions|handoff|remove|doctor|path) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
+    status|sessions|handoff|remove|doctor|path|clone|prune|best) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
     *)                                          "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@" ;;
   esac
 }
 claude-doctor()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" doctor "$@"; }
 claude-profile-clone() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clone "$@"; }
+claude-prune()    { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" prune "$@"; }
+claude-best()     { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" best  "$@"; }
+
+# Launch claude on whichever signed-in account has the most headroom.
+claude-auto() {
+  local pick
+  pick=$("$CLAUDE_PY" "$CLAUDE_PROFILE_PY" best --quiet) || return $?
+  [ -n "$pick" ] || return 1
+  printf 'using profile %s\n' "$pick" >&2
+  claude-profile-exec "$pick" claude "$@"
+}
 
 # Run one command under a profile without switching this shell.
 #   claude-profile-exec work claude -p "summarise this repo"
@@ -99,5 +110,6 @@ complete -F _claude_profile_complete claude-profile-remove
 complete -F _claude_profile_complete claude-profile-exec
 complete -F _claude_profile_complete claude-profile-clone
 complete -F _claude_profile_complete claude-handoff
-complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir --plain" claude-sessions
-complete -W "status doctor sessions handoff remove path --live --dirs --no-usage --plain" claude-profiles
+complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir --plain -g --grep" claude-sessions
+complete -W "-o --older-than -p --profile -n --limit -y --yes --plain" claude-prune
+complete -W "status doctor sessions handoff remove clone prune best path --live --dirs --no-usage --plain" claude-profiles

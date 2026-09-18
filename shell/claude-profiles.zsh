@@ -22,12 +22,23 @@ claude-profile() {
 # `claude-profiles` with no subcommand means `status`; anything else passes through.
 claude-profiles() {
   case "$1" in
-    status|sessions|handoff|remove|doctor|path) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
+    status|sessions|handoff|remove|doctor|path|clone|prune|best) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
     *)                                          "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@" ;;
   esac
 }
 claude-doctor()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" doctor "$@" }
 claude-profile-clone() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clone "$@" }
+claude-prune()    { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" prune "$@" }
+claude-best()     { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" best  "$@" }
+
+# Launch claude on whichever signed-in account has the most headroom.
+claude-auto() {
+  local pick
+  pick=$("$CLAUDE_PY" "$CLAUDE_PROFILE_PY" best --quiet) || return $?
+  [ -n "$pick" ] || return 1
+  printf 'using profile %s\n' "$pick" >&2
+  claude-profile-exec "$pick" claude "$@"
+}
 
 # Run one command under a profile without switching this shell.
 #   claude-profile-exec work claude -p "summarise this repo"
@@ -125,8 +136,19 @@ _claude_sessions() {
     '(-p --profile)'{-p,--profile}'[profile to list]:profile:_claude_profile_names' \
     '(-n --limit)'{-n,--limit}'[max rows; bare flag = no limit]::count:' \
     '(-f --full)'{-f,--full}'[wrap long summaries instead of truncating]' \
-    '(-d --dir)'{-d,--dir}'[directory to filter on]:dir:_files -/'
+    '(-d --dir)'{-d,--dir}'[directory to filter on]:dir:_files -/' \
+    '(-g --grep)'{-g,--grep}'[only sessions containing PATTERN]:pattern:'
 }
+
+_claude_prune() {
+  _arguments \
+    '(-o --older-than)'{-o,--older-than}'[age threshold in days]:days:' \
+    '(-p --profile)'{-p,--profile}'[just this profile]:profile:_claude_profile_names' \
+    '(-n --limit)'{-n,--limit}'[rows to list]:count:' \
+    '(-y --yes)'{-y,--yes}'[actually delete]' \
+    '--plain[no borders]'
+}
+compdef _claude_prune claude-prune
 compdef _claude_sessions claude-sessions
 
 _claude_profiles() {
@@ -134,7 +156,9 @@ _claude_profiles() {
     local -a subs
     subs=(status:'profiles, accounts and usage' doctor:'check the install for problems'
           sessions:'list conversations' handoff:'copy a session to another profile'
-          remove:'delete a profile' path:'print a profile config dir')
+          remove:'delete a profile' clone:'copy settings between profiles'
+          prune:'delete old transcripts' best:'which account has the most headroom'
+          path:'print a profile config dir')
     _describe -t commands 'subcommand' subs && return
   fi
   _arguments \

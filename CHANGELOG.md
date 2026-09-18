@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-09-18
+
+### Added
+
+- **`claude-sessions --grep`** — search the full text of every message, yours
+  and Claude's, across any profile and directory. Matching sessions show the
+  matching passage in context instead of the opening prompt.
+- **`claude-best`** — names the signed-in account with the most headroom, judged
+  by its tightest limit rather than an average, so an account at 1% for five
+  hours but 95% for the week is not mistaken for free.
+- **`claude-auto`** — launches Claude on that account without switching your
+  shell.
+- **`claude-prune`** — delete old transcripts, dry run by default, reporting
+  what would be freed and how many newer sessions are being left alone.
+
 ## [1.0.0] - 2026-09-18
 
 First tagged release.
@@ -39,4 +54,5 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.1.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.0.0

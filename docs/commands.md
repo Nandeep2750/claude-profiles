@@ -14,6 +14,9 @@ scripts, or on a shell with no wrapper installed.
 | `claude-profile-clone` | `claude-profiles.py clone` |
 | `claude-profile-exec` | *(shell only)* |
 | `claude-doctor` | `claude-profiles.py doctor` |
+| `claude-prune` | `claude-profiles.py prune` |
+| `claude-best` | `claude-profiles.py best` |
+| `claude-auto` | *(shell only)* |
 | - | `claude-profiles.py path NAME` |
 
 PowerShell users get the same names as aliases, plus verb-noun forms
@@ -160,6 +163,7 @@ Defaults to the current directory and the active profile, newest first.
 | `-f`, `--full` | wrap long summaries instead of truncating them |
 | `-d DIR`, `--dir DIR` | filter on a directory other than the current one |
 | `--plain` | no borders - easier to pipe into other tools |
+| `-g PATTERN`, `--grep PATTERN` | only sessions containing PATTERN (case-insensitive regex) |
 
 ```sh
 claude-sessions                   # this directory, active profile
@@ -170,6 +174,28 @@ claude-sessions -p work -n 50     # 50 most recent in the "work" profile
 
 Summaries adapt to terminal width between 40 and 100 characters. `TURNS` counts
 your messages, ignoring tool results and sidechains.
+
+### Searching your conversations
+
+```sh
+claude-sessions -A -a --grep "rate limit"
+```
+
+Searches the full text of every message - **yours and Claude's** - not just the
+opening prompt. Sessions that match show the matching passage in place of the
+summary, with surrounding context:
+
+```
+│ 1 │ proofed │ 0m ago │ 55 │ eb82f424… │ ~ │ …gives each profile its own macOS Keychain… │
+```
+
+The pattern is a case-insensitive regular expression, so `-g "auth|login"` works.
+An invalid pattern exits 2 with the regex error rather than silently matching
+nothing.
+
+Combine it with `-A -a` to search every profile and every directory at once -
+this is the fastest way to find the conversation where you solved something
+months ago.
 
 ---
 
@@ -294,6 +320,88 @@ refuses unknown names, listing what is available instead.
     Every conversation in that profile is deleted with it. If you want to keep
     one, [hand it off](guides/handoff.md) to another profile first:
     `claude-handoff default <session-id>`.
+
+---
+
+## `claude-best`
+
+Names the signed-in account with the most headroom.
+
+```
+  -> proofed      5% used  (5h 5%, 7d 2%)
+     biztech      32% used (5h 32%, 7d 17%)
+```
+
+A profile is judged by its **tightest** limit, not its average - an account at
+1% for the next five hours but 95% through its week is nearly out, and is
+ranked accordingly. Accounts that are locked out or not signed in are skipped.
+
+| Flag | Effect |
+|---|---|
+| `-q`, `--quiet` | print just the name, for scripting |
+| `--cached` | skip the live fetch and use cached figures |
+
+Fetches live by default, so it reflects reality rather than a stale snapshot.
+
+---
+
+## `claude-auto`
+
+Launch Claude on whichever account has the most headroom, without choosing
+yourself.
+
+```sh
+claude-auto                       # interactive session on the best account
+claude-auto -p "explain this bug"
+```
+
+It resolves `claude-best --quiet`, reports the choice on stderr, then runs
+`claude` under that profile via `claude-profile-exec` - so your shell's own
+profile is unchanged.
+
+!!! tip "When to use which"
+    Use `claude-profile` when the account matters (client work, a specific
+    subscription). Use `claude-auto` when it does not and you just want
+    capacity.
+
+---
+
+## `claude-prune`
+
+Delete old conversation transcripts. **Dry run by default.**
+
+```sh
+claude-prune                      # show what is older than 90 days
+claude-prune -o 30                # ...older than 30 days
+claude-prune -o 90 --yes          # actually delete
+```
+
+```
+╭────────┬─────────┬──────────────────────────────────────┬─────────────────────────────────╮
+│ WHEN   │ PROFILE │ SESSION ID                           │ DIRECTORY                       │
+├────────┼─────────┼──────────────────────────────────────┼─────────────────────────────────┤
+│ Aug 19 │ default │ a6c22511-53a7-4a10-8e16-104b79f2dc17 │ ~/Projects/Acme/api             │
+╰────────┴─────────┴──────────────────────────────────────┴─────────────────────────────────╯
+
+3 session(s) older than 90 days, 2.3MB  (90 newer session(s) untouched)
+dry run - nothing deleted. pass --yes to delete.
+```
+
+| Flag | Effect |
+|---|---|
+| `-o DAYS`, `--older-than DAYS` | age threshold (default 90) |
+| `-p NAME`, `--profile NAME` | just one profile (default: all) |
+| `-n N`, `--limit N` | rows to list, `0` for all (default 20) |
+| `-y`, `--yes` | actually delete |
+| `--plain` | no borders |
+
+It reports how much space would be freed and how many newer sessions it is
+leaving alone, so you can see the blast radius before committing.
+
+!!! danger "Deleted transcripts are gone"
+    There is no undo, and `claude --resume` cannot reach a deleted session.
+    Check the dry run first, and [hand off](guides/handoff.md) anything worth
+    keeping.
 
 ---
 

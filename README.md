@@ -93,7 +93,16 @@ cached value rather than breaking the table.
 | `claude-profile-exec NAME CMD` | Run one command under a profile without switching |
 | `claude-profile-clone SRC DST` | Seed a profile's settings from another one |
 | `claude-doctor` | Check the installation for problems |
+| `claude-auto` | Launch Claude on whichever account has the most room |
+| `claude-best` | Which account has the most headroom |
+| `claude-prune` | Delete old transcripts (dry run by default) |
 | `claude-profiles --live` | Current usage instead of the cached snapshot |
+
+Search every conversation you have ever had, across all accounts:
+
+```sh
+claude-sessions -A -a --grep "rate limit"
+```
 
 Tab completion works on all of them.
 [Full reference →](https://nandeep2750.github.io/claude-profiles/commands/)

@@ -71,6 +71,8 @@ class Fixture(unittest.TestCase):
                            "utilization": {
                                "five_hour": {"utilization": 59, "resets_at": None},
                                "seven_day": {"utilization": 40, "resets_at": None}}}}, fh)
+        with open(os.path.join(self.home, ".claude", ".credentials.json"), "w") as fh:
+            json.dump({"claudeAiOauth": {"accessToken": "fake-default"}}, fh)
         # work profile: logged in via credentials file
         w = os.path.join(self.ph, "work")
         os.makedirs(w, exist_ok=True)
@@ -244,6 +246,128 @@ class TestSessions(Fixture):
             fh.write(json.dumps({"type": "user", "cwd": "/x",
                                  "message": {"content": "the real one"}}) + "\n")
         self.assertEqual(self.core.scan(p)[4], "the real one")
+
+
+class TestSearch(Fixture):
+    def setUp(self):
+        super().setUp()
+        self.proj = os.path.join(self.home, "code", "api")
+        os.makedirs(self.proj, exist_ok=True)
+        enc = encode_dir(self.proj)
+        transcript(os.path.join(self.home, ".claude", "projects", enc,
+                                "ccc11111-0000-0000-0000-000000000000.jsonl"),
+                   self.proj, ["fix the login redirect"])
+        # a session whose only match is in an assistant reply
+        p = os.path.join(self.home, ".claude", "projects", enc,
+                         "ddd22222-0000-0000-0000-000000000000.jsonl")
+        with open(p, "w") as fh:
+            fh.write(json.dumps({"type": "user", "cwd": self.proj,
+                                 "message": {"content": "what about storage?"}}) + "\n")
+            fh.write(json.dumps({"type": "assistant", "cwd": self.proj,
+                                 "message": {"content": "Use the macOS Keychain for that."}}) + "\n")
+
+    def test_matches_a_user_message(self):
+        code, out, _ = self.run_cmd("sessions", "-d", self.proj, "--plain", "-g", "redirect")
+        self.assertEqual(code, 0)
+        self.assertIn("ccc11111", out)
+        self.assertNotIn("ddd22222", out)
+
+    def test_matches_an_assistant_message(self):
+        code, out, _ = self.run_cmd("sessions", "-d", self.proj, "--plain", "-g", "keychain")
+        self.assertEqual(code, 0)
+        self.assertIn("ddd22222", out)
+
+    def test_search_is_case_insensitive(self):
+        code, out, _ = self.run_cmd("sessions", "-d", self.proj, "--plain", "-g", "REDIRECT")
+        self.assertEqual(code, 0)
+        self.assertIn("ccc11111", out)
+
+    def test_no_match_exits_one(self):
+        code, _, err = self.run_cmd("sessions", "-d", self.proj, "--plain", "-g", "zzzznope")
+        self.assertEqual(code, 1)
+        self.assertIn("matching", err)
+
+    def test_bad_regex_is_reported(self):
+        code, _, err = self.run_cmd("sessions", "-d", self.proj, "-g", "[unclosed")
+        self.assertEqual(code, 2)
+        self.assertIn("bad --grep", err)
+
+    def test_summary_shows_the_match_not_the_opening_prompt(self):
+        code, out, _ = self.run_cmd("sessions", "-d", self.proj, "--plain", "-g", "keychain", "-f")
+        self.assertIn("Keychain", out)
+        self.assertNotIn("what about storage", out)
+
+
+class TestPrune(Fixture):
+    def setUp(self):
+        super().setUp()
+        self.proj = os.path.join(self.home, "code", "api")
+        os.makedirs(self.proj, exist_ok=True)
+        enc = encode_dir(self.proj)
+        self.old = os.path.join(self.home, ".claude", "projects", enc,
+                                "eee11111-0000-0000-0000-000000000000.jsonl")
+        self.new = os.path.join(self.home, ".claude", "projects", enc,
+                                "fff22222-0000-0000-0000-000000000000.jsonl")
+        transcript(self.old, self.proj, ["ancient history"])
+        transcript(self.new, self.proj, ["recent work"])
+        long_ago = time.time() - 200 * 86400
+        os.utime(self.old, (long_ago, long_ago))
+
+    def test_dry_run_deletes_nothing(self):
+        code, out, _ = self.run_cmd("prune", "-o", "90", "--plain")
+        self.assertEqual(code, 0)
+        self.assertIn("dry run", out)
+        self.assertTrue(os.path.isfile(self.old))
+
+    def test_yes_deletes_only_the_old_one(self):
+        code, out, _ = self.run_cmd("prune", "-o", "90", "--yes", "--plain")
+        self.assertEqual(code, 0)
+        self.assertFalse(os.path.isfile(self.old))
+        self.assertTrue(os.path.isfile(self.new), "recent sessions must survive")
+
+    def test_nothing_old_enough_is_a_no_op(self):
+        code, out, _ = self.run_cmd("prune", "-o", "3650", "--plain")
+        self.assertEqual(code, 0)
+        self.assertIn("nothing older", out)
+        self.assertTrue(os.path.isfile(self.old))
+
+    def test_can_target_one_profile(self):
+        code, out, _ = self.run_cmd("prune", "-o", "90", "-p", "work", "--plain")
+        self.assertEqual(code, 0)
+        self.assertTrue(os.path.isfile(self.old), "other profiles must be untouched")
+
+
+class TestBest(Fixture):
+    def test_picks_the_profile_with_the_most_headroom(self):
+        w = os.path.join(self.ph, "work")
+        with open(os.path.join(w, ".claude.json"), "w") as fh:
+            json.dump({"oauthAccount": {"emailAddress": "me@work.com"},
+                       "cachedUsageUtilization": {
+                           "fetchedAtMs": int(time.time() * 1000),
+                           "utilization": {"five_hour": {"utilization": 5, "resets_at": None},
+                                           "seven_day": {"utilization": 5, "resets_at": None}}}}, fh)
+        code, out, _ = self.run_cmd("best", "--cached", "--quiet")
+        self.assertEqual(code, 0)
+        self.assertEqual(out.strip(), "work")      # work 5% beats default 59%
+
+    def test_judged_by_the_tightest_limit(self):
+        w = os.path.join(self.ph, "work")
+        with open(os.path.join(w, ".claude.json"), "w") as fh:
+            json.dump({"oauthAccount": {"emailAddress": "me@work.com"},
+                       "cachedUsageUtilization": {
+                           "fetchedAtMs": int(time.time() * 1000),
+                           "utilization": {"five_hour": {"utilization": 1, "resets_at": None},
+                                           "seven_day": {"utilization": 95, "resets_at": None}}}}, fh)
+        code, out, _ = self.run_cmd("best", "--cached", "--quiet")
+        self.assertEqual(out.strip(), "default",
+                         "a profile at 95% weekly is not 'free' just because its 5h is 1%")
+
+    def test_no_usable_profiles_exits_one(self):
+        os.remove(os.path.join(self.home, ".claude.json"))
+        shutil.rmtree(os.path.join(self.ph, "work"))
+        code, _, err = self.run_cmd("best", "--cached", "--quiet")
+        self.assertEqual(code, 1)
+        self.assertIn("no signed-in profile", err)
 
 
 class TestHandoff(Fixture):

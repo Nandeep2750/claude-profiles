@@ -15,7 +15,7 @@ Subcommands: path | status | sessions | handoff | remove
 import argparse, concurrent.futures, datetime, hashlib, json, os, re, shutil, subprocess, sys, textwrap, time
 import urllib.error, urllib.request
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -224,9 +224,15 @@ def _text(content):
     return ""
 
 
-def scan(path):
+def scan(path, pattern=None):
+    """(cwd, branch, turns, mtime, summary) for a transcript, or None.
+
+    With `pattern`, returns None unless some message matches, and uses the first
+    matching message as the summary instead of the opening prompt.
+    """
     cwd = branch = None
     turns, summary = 0, ""
+    matched = None
     try:
         with open(path, errors="replace") as fh:
             for line in fh:
@@ -240,6 +246,13 @@ def scan(path):
                     cwd = o["cwd"]
                 if branch is None and o.get("gitBranch"):
                     branch = o["gitBranch"]
+                if pattern is not None and matched is None and o.get("type") == "assistant":
+                    at = _text((o.get("message") or {}).get("content"))
+                    at = " ".join(re.sub(r"<[^>]+>.*?</[^>]+>", " ", at, flags=re.S).split())
+                    if at and pattern.search(at):
+                        m = pattern.search(at)
+                        lo = max(0, m.start() - 40)
+                        matched = ("…" if lo else "") + at[lo:lo + 160]
                 if o.get("type") == "user" and not o.get("isMeta"):
                     t = _text((o.get("message") or {}).get("content"))
                     t = re.sub(r"<[^>]+>.*?</[^>]+>", " ", t, flags=re.S)
@@ -249,10 +262,16 @@ def scan(path):
                     turns += 1
                     if not summary:
                         summary = t
+                    if pattern is not None and matched is None and pattern.search(t):
+                        matched = t
     except OSError:
         return None
     if turns == 0 and not summary:
         return None
+    if pattern is not None:
+        if matched is None:
+            return None
+        summary = matched
     return cwd, branch, turns, os.path.getmtime(path), summary
 
 
@@ -412,11 +431,19 @@ def cmd_sessions(a):
     else:
         want = [active_profile()]
 
+    pattern = None
+    if a.grep:
+        try:
+            pattern = re.compile(a.grep, re.I)
+        except re.error as e:
+            print(f"bad --grep pattern: {e}", file=sys.stderr)
+            return 2
+
     target = os.path.abspath(a.dir)
     found = []
     for p in want:
         for f in transcripts(p):
-            info = scan(f)
+            info = scan(f, pattern)
             if not info:
                 continue
             cwd, branch, turns, mtime, summary = info
@@ -426,7 +453,8 @@ def cmd_sessions(a):
     found.sort(reverse=True)
     if not found:
         where = "any directory" if a.all else target
-        print(f"no sessions in profile(s) {', '.join(want)} for {where}", file=sys.stderr)
+        what = f"matching '{a.grep}' " if a.grep else ""
+        print(f"no sessions {what}in profile(s) {', '.join(want)} for {where}", file=sys.stderr)
         print("try:  claude-sessions -a       (all directories)", file=sys.stderr)
         print("      claude-sessions -A -a    (all profiles too)", file=sys.stderr)
         return 1
@@ -700,6 +728,94 @@ def cmd_clone(a):
     return 0
 
 
+def cmd_prune(a):
+    """Delete transcripts older than N days. Dry run unless --yes."""
+    C = color()
+    D = lambda t: C(t, "dim")
+    want = [a.profile] if a.profile else profile_names()
+    cutoff = time.time() - a.older_than * 86400
+
+    doomed, kept, freed = [], 0, 0
+    for p in want:
+        for f in transcripts(p):
+            mtime = os.path.getmtime(f)
+            if mtime < cutoff:
+                doomed.append((mtime, p, f, os.path.getsize(f)))
+                freed += os.path.getsize(f)
+            else:
+                kept += 1
+    doomed.sort()
+
+    if not doomed:
+        print(f"nothing older than {a.older_than} days in {', '.join(want)}"
+              f" ({kept} session(s) kept)")
+        return 0
+
+    headers = ["WHEN", "PROFILE", "SESSION ID", "DIRECTORY"]
+    rows = []
+    for mtime, p, f, _ in doomed[:a.limit or len(doomed)]:
+        info = scan(f)
+        cwd = (info[0] if info else "?") or "?"
+        rows.append([age(mtime), p, C(os.path.basename(f)[:-6], "cy"),
+                     cwd.replace(HOME, "~")])
+    print(render_table(headers, rows, ["l", "l", "l", "l"], plain=a.plain, dim=D))
+    if a.limit and len(doomed) > a.limit:
+        print(D(f"...and {len(doomed) - a.limit} more (use -n 0 to list them all)"))
+
+    print(f"\n{len(doomed)} session(s) older than {a.older_than} days, {human(freed)}"
+          f"  ({kept} newer session(s) untouched)")
+    if not a.yes:
+        print(C("dry run - nothing deleted. pass --yes to delete.", "yl"))
+        return 0
+
+    gone = 0
+    for _, _, f, _ in doomed:
+        try:
+            os.remove(f)
+            gone += 1
+        except OSError as e:
+            print(f"could not delete {f}: {e}", file=sys.stderr)
+    print(C(f"deleted {gone} session(s), freed {human(freed)}", "gr"))
+    return 0
+
+
+def cmd_best(a):
+    """Name the signed-in profile with the most headroom."""
+    C = color()
+    best, table = None, []
+    for n in profile_names():
+        d = profile_dir(n)
+        if not has_credentials(d):
+            continue
+        u = (fetch_live(d) if not a.cached else None) or usage_of(d)
+        if not u:
+            continue
+        pcts = [b["pct"] for b in (u.get("5h"), u.get("7d"))
+                if b and b.get("pct") is not None]
+        if not pcts or any((u.get(k) or {}).get("locked") for k in ("5h", "7d")):
+            continue
+        worst = max(pcts)                       # a profile is only as free as its tightest limit
+        table.append((worst, n, u))
+        if best is None or worst < best[0]:
+            best = (worst, n, u)
+
+    if best is None:
+        print("no signed-in profile has usable usage figures", file=sys.stderr)
+        return 1
+    if a.quiet:
+        print(best[1])
+        return 0
+    for worst, n, u in sorted(table):
+        mark = "->" if n == best[1] else "  "
+        tone = "gr" if worst < 75 else ("yl" if worst < 90 else "rd")
+        five = (u.get("5h") or {}).get("pct")
+        seven = (u.get("7d") or {}).get("pct")
+        print(f"  {mark} {n:<12} {C(f'{worst:g}% used', tone)}"
+              f"  (5h {five:g}%, 7d {seven:g}%)" if isinstance(five, float) or isinstance(seven, float)
+              else f"  {mark} {n:<12} {C(f'{worst}% used', tone)}  (5h {five}%, 7d {seven}%)")
+    return 0
+
+
 def cmd_doctor(a):
     C = color()
     issues, warns = [], []
@@ -827,7 +943,24 @@ def main():
     p.add_argument("-f", "--full", action="store_true")
     p.add_argument("-d", "--dir", default=os.getcwd())
     p.add_argument("--plain", action="store_true", help="no borders - easier to pipe")
+    p.add_argument("-g", "--grep", metavar="PATTERN",
+                   help="only sessions containing PATTERN (case-insensitive regex)")
     p.set_defaults(fn=cmd_sessions)
+
+    p = sub.add_parser("prune", help="delete old conversation transcripts")
+    p.add_argument("-o", "--older-than", type=int, default=90, metavar="DAYS",
+                   help="age threshold in days (default 90)")
+    p.add_argument("-p", "--profile", help="just this profile (default: all)")
+    p.add_argument("-n", "--limit", type=int, default=20,
+                   help="rows to list (0 for all)")
+    p.add_argument("-y", "--yes", action="store_true", help="actually delete")
+    p.add_argument("--plain", action="store_true")
+    p.set_defaults(fn=cmd_prune)
+
+    p = sub.add_parser("best", help="which account has the most headroom")
+    p.add_argument("-q", "--quiet", action="store_true", help="print just the name")
+    p.add_argument("--cached", action="store_true", help="skip the live fetch")
+    p.set_defaults(fn=cmd_best)
 
     p = sub.add_parser("clone", help="copy settings from one profile into another")
     p.add_argument("source")
