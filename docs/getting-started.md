@@ -84,6 +84,11 @@ while a work desktop has all three.
 Both directories are created for you. `install.sh` creates
 `~/.claude-profiles`; `claude-profile NAME` creates each profile inside it.
 
+Profiles also share nothing with each other - MCP servers, plugins, settings and
+conversation history are all per-profile. See
+[What's shared, what isn't](isolation.md) before you wonder where your MCP
+servers went.
+
 !!! danger "Do not move a profile directory after logging in"
     On macOS the Keychain entry is keyed to the profile's absolute path, so
     moving it invalidates the credentials and forces a re-login.
@@ -93,6 +98,7 @@ Both directories are created for you. `install.sh` creates
 - [Add an account](guides/add-an-account.md)
 - [Per-project accounts](guides/per-project.md) - switch automatically on `cd`
 - [Session handoff](guides/handoff.md) - continue a conversation on another account
+- [What's shared, what isn't](isolation.md) - why a new profile starts empty
 
 ## Uninstall
 

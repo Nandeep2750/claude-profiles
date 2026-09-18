@@ -62,9 +62,9 @@ Setting `CLAUDE_CONFIG_DIR` relocates everything, not just the login:
   plugins/  cache/  backups/
 ```
 
-So profiles do not share MCP servers, permissions or settings. That is usually
-what you want for work/client separation, but it does mean configuring a new
-profile from scratch. To copy settings across:
+So profiles do not share MCP servers, permissions or settings - see
+[What's shared, what isn't](isolation.md) for the full picture, including the
+one exception (files inside a project folder). To copy settings across:
 
 ```sh
 cp ~/.claude/settings.json ~/.claude-profiles/work/

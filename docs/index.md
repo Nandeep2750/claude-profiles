@@ -67,6 +67,11 @@ claude-profiles          # see every profile and who is signed into it
 
 Two accounts showing `ok` at once is normal - that is the whole point.
 
+!!! info "Profiles share nothing"
+    Each profile is a complete, separate copy of Claude Code's configuration -
+    MCP servers, plugins, settings and conversation history included. See
+    [What's shared, what isn't](isolation.md).
+
 ## How it works, in one line
 
 Claude Code reads `CLAUDE_CONFIG_DIR` and derives its credential slot from that

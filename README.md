@@ -131,6 +131,12 @@ Remove it and `claude` keeps working unchanged.
 
 Account data stays machine-local. Run `/login` once per profile on each machine.
 
+Profiles also share nothing with **each other** — MCP servers, plugins, settings
+and conversation history are all per-profile, and nothing is inherited from
+`~/.claude`. The one exception is files inside a project folder (`.mcp.json`,
+`CLAUDE.md`), which every profile reads.
+[What's shared, what isn't →](https://nandeep2750.github.io/claude-profiles/isolation/)
+
 > [!WARNING]
 > On macOS a profile's Keychain entry is keyed to its **absolute path**. Moving
 > or renaming a profile directory after logging in invalidates its credentials.
@@ -144,6 +150,7 @@ PowerShell.
 
 - **[Getting started](https://nandeep2750.github.io/claude-profiles/getting-started/)** — install and first profile
 - **[Commands](https://nandeep2750.github.io/claude-profiles/commands/)** — every command and flag
+- **[What's shared, what isn't](https://nandeep2750.github.io/claude-profiles/isolation/)** — profile isolation, and the one exception
 - **[How it works](https://nandeep2750.github.io/claude-profiles/how-it-works/)** — mechanism and storage layout
 - **[Troubleshooting](https://nandeep2750.github.io/claude-profiles/troubleshooting/)** — common problems and fixes
 

@@ -42,9 +42,10 @@ claude-profile porofed        # creates "porofed", reports (not logged in)
 ## Profiles do not share settings
 
 Setting `CLAUDE_CONFIG_DIR` relocates everything, not just the login: settings,
-MCP servers, permissions and session history are all per-profile. That is
-usually what you want for work/client separation, but it does mean a new profile
-starts empty.
+MCP servers, plugins, permissions and session history are all per-profile. That
+is usually what you want for work/client separation, but it does mean a new
+profile starts empty. Full detail:
+[What's shared, what isn't](../isolation.md).
 
 To copy settings across:
 
