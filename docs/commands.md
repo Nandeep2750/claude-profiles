@@ -44,14 +44,14 @@ stock `~/.claude`. It is not a directory under `~/.claude-profiles`.
 
 ## `claude-profiles`
 
-List every profile, which account is signed into it, and whether credentials
-are present.
+List every profile, which account is signed into it, whether credentials are
+present, and how much of each account's usage limit is consumed.
 
 ```
-   PROFILE  CONFIG DIR                        ACCOUNT                  AUTH
-*  default  ~/.claude                         you@example.com          ok
-   work     ~/.claude-profiles/work           you@company.com          ok
-   client   ~/.claude-profiles/client         (not logged in)          none
+   PROFILE  ACCOUNT              AUTH  5-HOUR            7-DAY             AS OF
+*  default  you@example.com      ok     59%  in 53m       40%  in 4d23h    1h ago
+   work     you@company.com      ok      3%  in 1h13m     87%  in 2d18h    2h ago
+   client   (not logged in)      none  -                 -                 never used
 ```
 
 | Column | Meaning |
@@ -59,9 +59,46 @@ are present.
 | `*` | active in this shell |
 | `ACCOUNT` | email read from that profile's `.claude.json` |
 | `AUTH` | `ok` if credentials exist, `none` if `/login` is still needed |
+| `5-HOUR` | percent of the rolling 5-hour limit used, and when it resets |
+| `7-DAY` | percent of the weekly limit used, and when it resets |
+| `AS OF` | how old the usage figures are |
+
+Percentages are colour-coded: green below 75%, amber from 75%, red from 90%.
+A `locked` cell means that limit is currently exhausted.
+
+There are **two independent limits** with separate clocks, which is why both get
+their own reset column. An account can be fine on one and nearly out on the
+other - the example above shows `work` at 3% for the next five hours but 87%
+through its week.
+
+| Flag | Effect |
+|---|---|
+| `--dirs` | also show each profile's config directory |
+| `--no-usage` | hide the usage columns |
+
+### Usage figures are cached, not live
+
+!!! warning "Read the AS OF column"
+    Claude Code writes usage data to a profile's config only when **that
+    profile runs**. A profile you have not used today shows figures from
+    whenever you last used it, and a profile that has never run shows
+    `never used`.
+
+The `AS OF` value turns amber once the snapshot is more than a day old.
+
+To refresh a profile's figures, start a session under it:
+
+```sh
+claude-profile work
+claude       # any session refreshes the cache on startup
+```
+
+There is deliberately no `--refresh` flag. Refreshing requires authenticating as
+that account, and doing it for every profile on every listing would burn quota
+to answer a question about quota.
 
 Two accounts showing `ok` at once is normal and expected - that is the whole
-point. See [how-it-works.md](how-it-works.md) for where credentials live per OS.
+point. See [How it works](how-it-works.md) for where credentials live per OS.
 
 ---
 

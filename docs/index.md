@@ -59,13 +59,16 @@ claude-profiles          # see every profile and who is signed into it
 ```
 
 ```
-   PROFILE  CONFIG DIR                        ACCOUNT                  AUTH
-*  default  ~/.claude                         you@example.com          ok
-   work     ~/.claude-profiles/work           you@company.com          ok
-   client   ~/.claude-profiles/client         (not logged in)          none
+   PROFILE  ACCOUNT              AUTH  5-HOUR            7-DAY             AS OF
+*  default  you@example.com      ok     59%  in 53m       40%  in 4d23h    1h ago
+   work     you@company.com      ok      3%  in 1h13m     87%  in 2d18h    2h ago
+   client   (not logged in)      none  -                 -                 never used
 ```
 
-Two accounts showing `ok` at once is normal - that is the whole point.
+Two accounts signed in at once is normal - that is the whole point. The usage
+columns show which one has room before you start, so you are not surprised
+mid-conversation. `work` above is fine for the next five hours but 87% through
+its week.
 
 !!! info "Profiles share nothing"
     Each profile is a complete, separate copy of Claude Code's configuration -

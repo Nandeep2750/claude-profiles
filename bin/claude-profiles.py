@@ -12,7 +12,7 @@ slot from that path, so profiles stay logged in simultaneously:
 
 Subcommands: path | status | sessions | handoff | remove
 """
-import argparse, hashlib, json, os, re, shutil, subprocess, sys, textwrap, time
+import argparse, datetime, hashlib, json, os, re, shutil, subprocess, sys, textwrap, time
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -78,6 +78,57 @@ def account_email(pdir):
             return (json.load(fh).get("oauthAccount") or {}).get("emailAddress") or None
     except Exception:
         return None
+
+
+def usage_of(pdir):
+    """Cached usage utilisation for a profile, or None.
+
+    Claude Code refreshes this only when that profile actually runs, so it is a
+    snapshot, never live. Always show its age alongside.
+    """
+    try:
+        with open(global_config(pdir)) as fh:
+            u = json.load(fh).get("cachedUsageUtilization")
+    except Exception:
+        return None
+    if not u or not isinstance(u.get("utilization"), dict):
+        return None
+    out = {"age": max(0.0, time.time() - u.get("fetchedAtMs", 0) / 1000)}
+    for key, short in (("five_hour", "5h"), ("seven_day", "7d")):
+        v = u["utilization"].get(key)
+        if not isinstance(v, dict):
+            out[short] = None
+            continue
+        out[short] = {"pct": v.get("utilization"),
+                      "resets": v.get("resets_at"),
+                      "locked": v.get("locked_reason")}
+    return out
+
+
+def until(iso):
+    """'in 54m' / 'in 1h14m' / 'in 4d23h' for an ISO timestamp, or '-'."""
+    if not iso:
+        return "-"
+    try:
+        dt = datetime.datetime.fromisoformat(iso)
+    except ValueError:
+        return "-"
+    d = (dt - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+    if d <= 0:
+        return "due"
+    if d < 3600:
+        return f"in {int(d//60)}m"
+    if d < 86400:
+        return f"in {int(d//3600)}h{int(d%3600//60):02d}m"
+    return f"in {int(d//86400)}d{int(d%86400//3600)}h"
+
+
+def ago(sec):
+    if sec < 3600:
+        return f"{int(sec//60)}m ago"
+    if sec < 86400:
+        return f"{int(sec//3600)}h ago"
+    return f"{int(sec//86400)}d ago"
 
 
 # ── transcripts ──────────────────────────────────────────────────────
@@ -159,19 +210,58 @@ def cmd_path(a):
 
 def cmd_status(a):
     C = color()
+    act = active_profile()
     rows = []
     for n in profile_names():
         d = profile_dir(n)
-        rows.append((n, d, account_email(d) or "(not logged in)",
-                     "ok" if has_credentials(d) else "none"))
-    act = active_profile()
-    w = max(len(r[0]) for r in rows) + 2
-    print(C(f"{'':<2}{'PROFILE':<{w}}{'CONFIG DIR':<34}{'ACCOUNT':<28}{'AUTH'}", "b"))
-    for n, d, em, st in rows:
-        mark = "*" if n == act else " "
-        disp = d.replace(HOME, "~")
-        line = f"{mark:<2}{n:<{w}}{disp:<34}{em:<28}"
-        print(line + (C(st, "gr") if st == "ok" else C(st, "dim")))
+        rows.append({
+            "name": n, "dir": d,
+            "email": account_email(d) or "(not logged in)",
+            "auth": "ok" if has_credentials(d) else "none",
+            "usage": None if a.no_usage else usage_of(d),
+        })
+
+    wN = max(max(len(r["name"]) for r in rows), 7) + 2
+    wE = max(max(len(r["email"]) for r in rows), 7) + 2
+    wD = max(len(r["dir"].replace(HOME, "~")) for r in rows) + 2 if a.dirs else 0
+
+    head = f"{'':<2}{'PROFILE':<{wN}}"
+    if a.dirs:
+        head += f"{'CONFIG DIR':<{wD}}"
+    head += f"{'ACCOUNT':<{wE}}{'AUTH':<6}"
+    if not a.no_usage:
+        head += f"{'5-HOUR':<18}{'7-DAY':<18}{'AS OF'}"
+    print(C(head.rstrip(), "b"))
+
+    def pct_cell(bucket):
+        if not bucket or bucket.get("pct") is None:
+            return f"{'-':<18}"
+        pct = bucket["pct"]
+        tone = "rd" if pct >= 90 else ("yl" if pct >= 75 else "gr")
+        if bucket.get("locked"):
+            return C(f"{'locked':<18}", "rd")
+        cell = f"{pct}%"
+        return C(f"{cell:>4}", tone) + f"  {until(bucket['resets']):<12}"
+
+    for r in rows:
+        line = f"{'*' if r['name'] == act else ' ':<2}{r['name']:<{wN}}"
+        if a.dirs:
+            line += f"{r['dir'].replace(HOME, '~'):<{wD}}"
+        line += f"{r['email']:<{wE}}"
+        line += (C("ok", "gr") + "    ") if r["auth"] == "ok" else C(f"{'none':<6}", "dim")
+        u = r["usage"]
+        if not a.no_usage:
+            if not u:
+                line += f"{'-':<18}{'-':<18}" + C("never used", "dim")
+            else:
+                line += pct_cell(u.get("5h")) + pct_cell(u.get("7d"))
+                stale = u["age"] > 86400
+                line += C(ago(u["age"]), "yl" if stale else "dim")
+        print(line.rstrip())
+
+    if not a.no_usage and any(r["usage"] for r in rows):
+        print()
+        print(C("usage is a cached snapshot - it refreshes only when that profile runs claude", "dim"))
     return 0
 
 
@@ -360,7 +450,9 @@ def main():
     p = sub.add_parser("path", help="print a profile's config dir")
     p.add_argument("name"); p.set_defaults(fn=cmd_path)
 
-    p = sub.add_parser("status", help="list profiles and their accounts")
+    p = sub.add_parser("status", help="list profiles, accounts and usage")
+    p.add_argument("--dirs", action="store_true", help="show each profile's config dir")
+    p.add_argument("--no-usage", action="store_true", help="hide the usage columns")
     p.set_defaults(fn=cmd_status)
 
     p = sub.add_parser("sessions", help="list sessions readably")
