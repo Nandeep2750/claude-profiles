@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-09-18
+
+### Security
+
+- **Profile names are now validated before being used as paths.** A name such
+  as `../Documents` resolved outside `CLAUDE_PROFILE_HOME`, so
+  `claude-profile-remove ../Documents` deleted that directory. Names are now
+  restricted to letters, digits, `.`, `-` and `_`, and are checked in the core
+  and in all three shell layers. Regression tests cover it.
+
+### Fixed
+
+- `claude-best` crashed with a `TypeError` when an account reported only one of
+  its two limits.
+- Reset timestamps ending in `Z` were unparseable before Python 3.11 and showed
+  as `-`.
+- A mangled list comprehension in `claude-doctor`'s rc-file check would have
+  raised `NameError`.
+- `_buckets` now also finds a `limits` array at the payload's top level, not
+  only nested inside `utilization`.
+- Removed an unused `textwrap` import.
+
+### Added
+
+- `ruff` and `shellcheck` run in CI, with configuration checked in.
+- `CONTRIBUTING.md`, `SECURITY.md`, issue and pull-request templates,
+  `.editorconfig`, and Dependabot for actions and pip.
+
 ## [1.2.0] - 2026-09-18
 
 ### Added
@@ -65,6 +93,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.2.1]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.2.1
 [1.2.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.0.0

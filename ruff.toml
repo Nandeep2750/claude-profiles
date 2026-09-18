@@ -1,0 +1,21 @@
+line-length = 100
+target-version = "py39"
+
+[lint]
+select = ["E", "F", "W", "B", "S", "SIM", "UP", "C4", "RET", "I"]
+ignore = [
+  "E501",    # long lines are handled by line-length, not worth churn
+  "E731",    # short lambdas for colour helpers read better than defs here
+  "E701",    # one-line guards like `def ok(m): print(...)` are deliberate
+  "E702",
+  "S603",    # subprocess calls are all fixed argv, never a shell string
+  "S607",    # `security`/`git` are resolved from PATH on purpose
+  "UP038",
+  "S112",    # scanning transcripts skips malformed lines by design
+  "SIM105",  # try/except/pass reads clearer than contextlib.suppress here
+  "S110",
+  "S310",    # both URLs are https:// constants, asserted at the call site
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["S101"]   # assertions are the point of a test

@@ -7,6 +7,18 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: ruff
+        run: pipx run ruff check .
+      - name: shellcheck
+        run: shellcheck --severity=warning shell/claude-profiles.bash install.sh tests/test_shell.sh
+
   test:
     name: ${{ matrix.os }} / python ${{ matrix.python }}
     runs-on: ${{ matrix.os }}

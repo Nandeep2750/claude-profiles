@@ -13,6 +13,9 @@ function Set-ClaudeProfile {
         $d = if ($env:CLAUDE_CONFIG_DIR)   { $env:CLAUDE_CONFIG_DIR }   else { Join-Path $HOME ".claude" }
         Write-Host "claude profile: $n"; Write-Host "config dir    : $d"; return
     }
+    if ($Name -ne "default" -and ($Name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$' -or $Name -match '\.\.')) {
+        Write-Error "invalid profile name: $Name"; return
+    }
     if ($Name -eq "default") {
         Remove-Item Env:CLAUDE_CONFIG_DIR   -ErrorAction SilentlyContinue
         Remove-Item Env:CLAUDE_PROFILE_NAME -ErrorAction SilentlyContinue
@@ -41,7 +44,10 @@ function Invoke-ClaudeProfile {
     $prevDir  = $env:CLAUDE_CONFIG_DIR
     $prevName = $env:CLAUDE_PROFILE_NAME
     try {
-        if ($Name -eq "default") {
+        if ($Name -ne "default" -and ($Name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$' -or $Name -match '\.\.')) {
+        Write-Error "invalid profile name: $Name"; return
+    }
+    if ($Name -eq "default") {
             Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue
         } else {
             $dir = Join-Path $script:ProfileHome $Name

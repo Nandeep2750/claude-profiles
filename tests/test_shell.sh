@@ -63,7 +63,7 @@ is "no marker falls back to default" "" "${CLAUDE_PROFILE_NAME:-}"
 
 # CLAUDE_DEFAULT_PROFILE changes where unmarked directories land
 mkdir -p "$CLAUDE_PROFILE_HOME/fallback"
-CLAUDE_DEFAULT_PROFILE=fallback
+export CLAUDE_DEFAULT_PROFILE=fallback   # read by the cd hook
 cd "$HOME/projects/other" || exit 1
 _claude_profile_last_pwd=force; _claude_profile_auto
 is "CLAUDE_DEFAULT_PROFILE is used when no marker" "fallback" "${CLAUDE_PROFILE_NAME:-}"
@@ -71,7 +71,7 @@ unset CLAUDE_DEFAULT_PROFILE
 claude-profile default >/dev/null
 
 # a marker still wins over the configured default
-CLAUDE_DEFAULT_PROFILE=fallback
+export CLAUDE_DEFAULT_PROFILE=fallback   # read by the cd hook
 cd "$HOME/projects/acme" || exit 1
 _claude_profile_last_pwd=force; _claude_profile_auto
 is "a marker beats CLAUDE_DEFAULT_PROFILE" "work" "${CLAUDE_PROFILE_NAME:-}"
@@ -103,6 +103,19 @@ claude-profile-clone work fresh >/dev/null 2>&1
 [ -f "$CLAUDE_PROFILE_HOME/fresh/.credentials.json" ] \
   && bad "clone never copies credentials" "absent" "PRESENT" \
   || ok "clone never copies credentials"
+
+# profile names must not be able to escape CLAUDE_PROFILE_HOME
+mkdir -p "$HOME/outside"
+claude-profile ../outside >/dev/null 2>&1
+is "traversal name is refused by claude-profile" "" "${CLAUDE_CONFIG_DIR:-}"
+claude-profile-exec ../outside true >/dev/null 2>&1 \
+  && bad "traversal name is refused by exec" "non-zero" "zero" \
+  || ok "traversal name is refused by exec"
+claude-profile "a/b" >/dev/null 2>&1
+is "slash in a name is refused" "" "${CLAUDE_CONFIG_DIR:-}"
+claude-profile work >/dev/null
+is "ordinary names still work" "work" "${CLAUDE_PROFILE_NAME:-}"
+claude-profile default >/dev/null
 
 # new subcommands dispatch through claude-profiles
 for sub in prune best clone update; do

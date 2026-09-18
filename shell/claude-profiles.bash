@@ -9,12 +9,28 @@ export CLAUDE_PROFILE_HOME
 : ${CLAUDE_PROFILE_PY:="${CLAUDE_TOOLS_DIR}/bin/claude-profiles.py"}
 : ${CLAUDE_PY:=$(command -v python3 || command -v python)}
 
+# Profile names become directory names, so reject anything that could escape
+# CLAUDE_PROFILE_HOME. Mirrors check_name() in bin/claude-profiles.py.
+_claude_valid_name() {
+  [ "$1" = "default" ] && return 0
+  case "$1" in
+    *..*|"") ;;
+    *) case "$1" in [A-Za-z0-9]*) 
+         case "$1" in *[!A-Za-z0-9._-]*) ;; *) return 0 ;; esac ;;
+       esac ;;
+  esac
+  echo "invalid profile name: $1" >&2
+  echo "names may contain letters, digits, '.', '-' and '_', and must start with a letter or digit" >&2
+  return 1
+}
+
 claude-profile() {
   case "$1" in
     "")      echo "claude profile: ${CLAUDE_PROFILE_NAME:-default}"
              echo "config dir    : ${CLAUDE_CONFIG_DIR:-$HOME/.claude}" ;;
     default) unset CLAUDE_CONFIG_DIR CLAUDE_PROFILE_NAME ;;
-    *)       export CLAUDE_CONFIG_DIR="$CLAUDE_PROFILE_HOME/$1"
+    *)       _claude_valid_name "$1" || return 1
+             export CLAUDE_CONFIG_DIR="$CLAUDE_PROFILE_HOME/$1"
              export CLAUDE_PROFILE_NAME="$1"
              [ -d "$CLAUDE_CONFIG_DIR" ] || mkdir -p "$CLAUDE_CONFIG_DIR" ;;
   esac
@@ -53,6 +69,7 @@ claude-profile-exec() {
   if [ "$name" = default ]; then
     env -u CLAUDE_CONFIG_DIR -u CLAUDE_PROFILE_NAME "$@"
   else
+    _claude_valid_name "$name" || return 1
     local dir="$CLAUDE_PROFILE_HOME/$name"
     [ -d "$dir" ] || { echo "no such profile: $name" >&2; return 1; }
     CLAUDE_CONFIG_DIR="$dir" CLAUDE_PROFILE_NAME="$name" "$@"
@@ -105,7 +122,7 @@ fi
 _claude_profile_complete() {
   local names
   names="default $(ls -1 "$CLAUDE_PROFILE_HOME" 2>/dev/null | tr '\n' ' ')"
-  COMPREPLY=( $(compgen -W "$names" -- "${COMP_WORDS[COMP_CWORD]}") )
+  mapfile -t COMPREPLY < <(compgen -W "$names" -- "${COMP_WORDS[COMP_CWORD]}")
 }
 complete -F _claude_profile_complete claude-profile
 complete -F _claude_profile_complete claude-profile-remove

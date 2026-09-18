@@ -213,7 +213,8 @@ PowerShell.
 
 ## Contributing
 
-Issues and pull requests are welcome.
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Security issues: please read [SECURITY.md](SECURITY.md) and report privately.
 
 Run the tests:
 

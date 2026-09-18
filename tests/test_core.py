@@ -4,8 +4,16 @@
 Every test runs against a throwaway HOME built from fixtures, so nothing
 touches the real profiles or Keychain.
 """
-import importlib.util, io, json, os, shutil, sys, tempfile, time, unittest
-from contextlib import redirect_stdout, redirect_stderr
+import importlib.util
+import io
+import json
+import os
+import shutil
+import sys
+import tempfile
+import time
+import unittest
+from contextlib import redirect_stderr, redirect_stdout
 
 CORE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                     "bin", "claude-profiles.py")
@@ -121,6 +129,44 @@ class TestDiscovery(Fixture):
         self.assertNotIn(".hidden", self.core.profile_names())
 
 
+class TestNameValidation(Fixture):
+    """A profile name becomes a directory that `remove` will delete."""
+
+    BAD = ["../Documents", "..", "../../etc", "a/b", "/etc", "",
+           ".hidden", "-leading", "a\\b", "with space", "..\\..\\x"]
+
+    def test_traversal_names_are_rejected(self):
+        for name in self.BAD:
+            with self.assertRaises(self.core.BadProfileName, msg=f"accepted {name!r}"):
+                self.core.check_name(name)
+
+    def test_profile_dir_rejects_traversal(self):
+        for name in ("../Documents", "..", "a/b"):
+            with self.assertRaises(self.core.BadProfileName):
+                self.core.profile_dir(name)
+
+    def test_remove_cannot_escape_the_profile_home(self):
+        outside = os.path.join(self.home, "Documents")
+        os.makedirs(outside, exist_ok=True)
+        with open(os.path.join(outside, "keepme.txt"), "w") as fh:
+            fh.write("important")
+        code, _, err = self.run_cmd("remove", "../Documents", "--yes")
+        self.assertEqual(code, 2)
+        self.assertIn("invalid profile name", err)
+        self.assertTrue(os.path.isfile(os.path.join(outside, "keepme.txt")),
+                        "remove escaped CLAUDE_PROFILE_HOME")
+
+    def test_clone_cannot_escape_the_profile_home(self):
+        code, _, err = self.run_cmd("clone", "work", "../Documents")
+        self.assertEqual(code, 2)
+        self.assertIn("invalid profile name", err)
+
+    def test_ordinary_names_are_accepted(self):
+        for name in ("work", "client-a", "team_2", "v1.2", "default", "a"):
+            self.assertEqual(self.core.check_name(name) if name != "default" else "default",
+                             name)
+
+
 class TestCredentials(Fixture):
     def test_credentials_file_counts_as_logged_in(self):
         self.assertTrue(self.core.has_credentials(os.path.join(self.ph, "work")))
@@ -189,7 +235,7 @@ class TestTable(Fixture):
 
     def test_every_rendered_row_is_the_same_width(self):
         t = self.core.render_table(["A", "B"], [["\x1b[32mgreen\x1b[0m", "x"], ["y", "zz"]])
-        widths = {self.core.vlen(l) for l in t.splitlines()}
+        widths = {self.core.vlen(line) for line in t.splitlines()}
         self.assertEqual(len(widths), 1, f"rows differ in width: {widths}")
 
     def test_plain_mode_has_no_borders(self):
@@ -389,6 +435,28 @@ class TestUpdate(Fixture):
         code, _, _ = self.run_cmd("update", "--check")
         self.assertIn(code, (0, 1))            # 1 if GitHub is unreachable
         self.assertEqual(sorted(os.listdir(self.ph)), before)
+
+
+class TestBestRobustness(Fixture):
+    def test_survives_a_profile_reporting_only_one_limit(self):
+        w = os.path.join(self.ph, "work")
+        with open(os.path.join(w, ".claude.json"), "w") as fh:
+            json.dump({"oauthAccount": {"emailAddress": "me@work.com"},
+                       "cachedUsageUtilization": {
+                           "fetchedAtMs": int(time.time() * 1000),
+                           "utilization": {"five_hour": {"utilization": 12.0, "resets_at": None},
+                                           "seven_day": None}}}, fh)
+        code, out, err = self.run_cmd("best", "--cached")
+        self.assertEqual(code, 0, f"crashed: {err}")
+        self.assertIn("work", out)
+
+    def test_until_handles_a_z_suffix(self):
+        # datetime.fromisoformat cannot parse 'Z' before Python 3.11
+        self.assertNotEqual(self.core.until("2099-01-01T00:00:00Z"), "-")
+
+    def test_until_handles_junk(self):
+        self.assertEqual(self.core.until("not a date"), "-")
+        self.assertEqual(self.core.until(None), "-")
 
 
 class TestHandoff(Fixture):

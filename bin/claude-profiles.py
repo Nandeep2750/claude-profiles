@@ -12,10 +12,21 @@ slot from that path, so profiles stay logged in simultaneously:
 
 Subcommands: path | status | sessions | handoff | remove
 """
-import argparse, concurrent.futures, datetime, hashlib, json, os, re, shutil, subprocess, sys, textwrap, time
-import urllib.error, urllib.request
+import argparse
+import concurrent.futures
+import datetime
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -23,8 +34,37 @@ DEFAULT_DIR = os.path.join(HOME, ".claude")
 IS_MAC = sys.platform == "darwin"
 
 
+VALID_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+class BadProfileName(ValueError):
+    pass
+
+
+def check_name(name):
+    """Reject anything that could escape CLAUDE_PROFILE_HOME.
+
+    Profile names become directory names, and commands like `remove` delete
+    what they resolve to, so a name such as '../Documents' must never be
+    accepted.
+    """
+    if not name or not VALID_NAME.match(name) or ".." in name:
+        raise BadProfileName(
+            f"invalid profile name: {name!r}\n"
+            "names may contain letters, digits, '.', '-' and '_', "
+            "and must start with a letter or digit")
+    return name
+
+
 def profile_dir(name):
-    return DEFAULT_DIR if name == "default" else os.path.join(PROF_HOME, name)
+    if name == "default":
+        return DEFAULT_DIR
+    check_name(name)
+    resolved = os.path.realpath(os.path.join(PROF_HOME, name))
+    root = os.path.realpath(PROF_HOME)
+    if resolved != root and not resolved.startswith(root + os.sep):
+        raise BadProfileName(f"profile {name!r} would resolve outside {PROF_HOME}")
+    return os.path.join(PROF_HOME, name)
 
 
 def profile_names():
@@ -151,7 +191,9 @@ def _buckets(obj):
                           if isinstance(v, dict) else None)
     # fall back to the flat `limits` list if the named keys are absent
     if not any(out.get(k) for k in ("5h", "7d")):
-        for lim in (u.get("limits") if isinstance(u, dict) else None) or []:
+        limits = (u.get("limits") if isinstance(u, dict) else None) \
+            or (obj.get("limits") if isinstance(obj, dict) else None)
+        for lim in limits or []:
             if not isinstance(lim, dict):
                 continue
             g = str(lim.get("group") or lim.get("kind") or "").lower()
@@ -167,6 +209,7 @@ def fetch_live(pdir, timeout=6):
     token = access_token(pdir)
     if not token:
         return None
+    assert USAGE_URL.startswith("https://")   # noqa: S101 - guards urlopen below
     req = urllib.request.Request(USAGE_URL, headers={
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
@@ -190,9 +233,11 @@ def until(iso):
     if not iso:
         return "-"
     try:
-        dt = datetime.datetime.fromisoformat(iso)
-    except ValueError:
+        dt = datetime.datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
         return "-"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
     d = (dt - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
     if d <= 0:
         return "due"
@@ -324,8 +369,8 @@ def render_table(headers, rows, aligns=None, plain=False, dim=None):
                                  for i, c in enumerate(r)).rstrip())
         return "\n".join(out)
 
-    def rule(l, m, r):
-        return D(l + m.join("─" * (w + 2) for w in widths) + r)
+    def rule(left, mid, right):
+        return D(left + mid.join("─" * (w + 2) for w in widths) + right)
 
     def line(cells):
         body = D("│") + D("│").join(
@@ -808,14 +853,18 @@ def cmd_best(a):
     if a.quiet:
         print(best[1])
         return 0
+    def pct(v):
+        if v is None:
+            return "-"
+        return f"{v:g}%" if isinstance(v, float) else f"{v}%"
+
     for worst, n, u in sorted(table):
         mark = "->" if n == best[1] else "  "
         tone = "gr" if worst < 75 else ("yl" if worst < 90 else "rd")
         five = (u.get("5h") or {}).get("pct")
         seven = (u.get("7d") or {}).get("pct")
-        print(f"  {mark} {n:<12} {C(f'{worst:g}% used', tone)}"
-              f"  (5h {five:g}%, 7d {seven:g}%)" if isinstance(five, float) or isinstance(seven, float)
-              else f"  {mark} {n:<12} {C(f'{worst}% used', tone)}  (5h {five}%, 7d {seven}%)")
+        print(f"  {mark} {n:<12} {C(pct(worst) + ' used', tone)}"
+              f"  (5h {pct(five)}, 7d {pct(seven)})")
     return 0
 
 
@@ -836,6 +885,7 @@ def installed_version():
 
 def latest_release(timeout=6):
     """Newest published tag on GitHub, or None."""
+    assert RELEASES_URL.startswith("https://")   # noqa: S101 - guards urlopen below
     req = urllib.request.Request(RELEASES_URL, headers={
         "Accept": "application/vnd.github+json", "User-Agent": "claude-profiles"})
     try:
@@ -941,7 +991,8 @@ def cmd_doctor(a):
         if not os.path.isfile(rc):
             continue
         with open(rc, errors="replace") as fh:
-            hits = [l for l in fh if "claude-profiles." in l and l.strip().startswith("source")]
+            hits = [line for line in fh
+                    if "claude-profiles." in line and line.strip().startswith("source")]
         if len(hits) > 1:
             bad(f"{os.path.basename(rc)} sources the shell layer {len(hits)} times - remove the duplicates")
         elif hits:
@@ -1077,7 +1128,11 @@ def main():
     p.set_defaults(fn=cmd_handoff)
 
     a = ap.parse_args()
-    return a.fn(a)
+    try:
+        return a.fn(a)
+    except BadProfileName as e:
+        print(e, file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
