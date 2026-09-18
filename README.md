@@ -34,9 +34,23 @@ credentials and forces a re-login.
 ## Install
 
 ```sh
-git clone <your-repo> ~/.claude-tools
+git clone git@github.com:nandeep-biztech/claude-profiles.git ~/.claude-tools
 sh ~/.claude-tools/install.sh        # macOS, Linux, WSL, Git-Bash
 ```
+
+HTTPS instead, if the machine has no SSH key set up yet:
+
+```sh
+git clone https://github.com/nandeep-biztech/claude-profiles.git ~/.claude-tools
+```
+
+> **Multiple GitHub accounts on one machine?** Plain `git@github.com:` uses
+> whichever identity your `~/.ssh/config` maps to that host. If it resolves to a
+> different account, the clone or push fails with *"Could not read from remote
+> repository"*. Use the matching host alias instead, e.g.
+> `git clone github-biztech:nandeep-biztech/claude-profiles.git ~/.claude-tools`,
+> or fix an existing clone with
+> `git remote set-url origin github-biztech:nandeep-biztech/claude-profiles.git`.
 
 Native Windows PowerShell:
 
