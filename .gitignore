@@ -1,0 +1,5 @@
+# profile directories hold credentials + transcripts - never commit
+*/
+!bin/
+!shell/
+.DS_Store

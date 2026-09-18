@@ -1,0 +1,57 @@
+# Claude Code multi-account profiles - native Windows PowerShell
+# Install:  see install.ps1  (or dot-source from $PROFILE)
+$script:ProfileHome = if ($env:CLAUDE_PROFILE_HOME) { $env:CLAUDE_PROFILE_HOME }
+                      else { Join-Path $HOME ".claude-profiles" }
+$script:Py  = (Get-Command python3, python -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+$script:Core = Join-Path $script:ProfileHome "bin\claude-profiles.py"
+
+function Set-ClaudeProfile {
+    [CmdletBinding()] param([Parameter(Position=0)][string]$Name)
+    if (-not $Name) {
+        $n = if ($env:CLAUDE_PROFILE_NAME) { $env:CLAUDE_PROFILE_NAME } else { "default" }
+        $d = if ($env:CLAUDE_CONFIG_DIR)   { $env:CLAUDE_CONFIG_DIR }   else { Join-Path $HOME ".claude" }
+        Write-Host "claude profile: $n"; Write-Host "config dir    : $d"; return
+    }
+    if ($Name -eq "default") {
+        Remove-Item Env:CLAUDE_CONFIG_DIR   -ErrorAction SilentlyContinue
+        Remove-Item Env:CLAUDE_PROFILE_NAME -ErrorAction SilentlyContinue
+    } else {
+        $dir = Join-Path $script:ProfileHome $Name
+        if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+        $env:CLAUDE_CONFIG_DIR   = $dir
+        $env:CLAUDE_PROFILE_NAME = $Name
+    }
+}
+
+function Get-ClaudeProfiles { & $script:Py $script:Core status @args }
+function Get-ClaudeSessions { & $script:Py $script:Core sessions @args }
+function Move-ClaudeSession { & $script:Py $script:Core handoff  @args }
+
+# auto-switch on directory change
+function Update-ClaudeProfileFromPath {
+    $dir = (Get-Location).Path; $name = $null
+    while ($dir) {
+        $marker = Join-Path $dir ".claude-profile"
+        if (Test-Path $marker) { $name = (Get-Content $marker -First 1).Trim(); break }
+        $parent = Split-Path $dir -Parent
+        if ($parent -eq $dir) { break }
+        $dir = $parent
+    }
+    if (-not $name) { $name = "default" }
+    Set-ClaudeProfile $name
+}
+
+Set-Alias claude-profile  Set-ClaudeProfile
+Set-Alias claude-profiles Get-ClaudeProfiles
+Set-Alias claude-sessions Get-ClaudeSessions
+Set-Alias claude-handoff  Move-ClaudeSession
+
+Register-ArgumentCompleter -CommandName Set-ClaudeProfile -ParameterName Name -ScriptBlock {
+    param($c,$p,$word)
+    @("default") + (Get-ChildItem $script:ProfileHome -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notin @("bin","shell") } | ForEach-Object Name) |
+      Where-Object { $_ -like "$word*" } |
+      ForEach-Object { [System.Management.Automation.CompletionResult]::new($_,$_,'ParameterValue',$_) }
+}
+
+Export-ModuleMember -Function * -Alias *

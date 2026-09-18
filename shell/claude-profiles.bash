@@ -1,0 +1,48 @@
+# Claude Code multi-account profiles - bash (Ubuntu/WSL/Git-Bash)
+# Source this from ~/.bashrc:  source ~/.claude-profiles/shell/claude-profiles.bash
+: ${CLAUDE_PROFILE_HOME:="${HOME}/.claude-profiles"}
+export CLAUDE_PROFILE_HOME
+: ${CLAUDE_PROFILE_PY:="${CLAUDE_PROFILE_HOME}/bin/claude-profiles.py"}
+: ${CLAUDE_PY:=$(command -v python3 || command -v python)}
+
+claude-profile() {
+  case "$1" in
+    "")      echo "claude profile: ${CLAUDE_PROFILE_NAME:-default}"
+             echo "config dir    : ${CLAUDE_CONFIG_DIR:-$HOME/.claude}" ;;
+    default) unset CLAUDE_CONFIG_DIR CLAUDE_PROFILE_NAME ;;
+    *)       export CLAUDE_CONFIG_DIR="$CLAUDE_PROFILE_HOME/$1"
+             export CLAUDE_PROFILE_NAME="$1"
+             [ -d "$CLAUDE_CONFIG_DIR" ] || mkdir -p "$CLAUDE_CONFIG_DIR" ;;
+  esac
+}
+claude-profiles() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@"; }
+claude-sessions() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" sessions "$@"; }
+claude-handoff()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" handoff  "$@"; }
+
+_claude_profile_last_pwd="__unset__"
+_claude_profile_auto() {
+  [ "$PWD" = "$_claude_profile_last_pwd" ] && return
+  _claude_profile_last_pwd="$PWD"
+  local dir="$PWD" name=""
+  while [ -n "$dir" ] && [ "$dir" != "/" ]; do
+    if [ -f "$dir/.claude-profile" ]; then
+      name=$(head -1 "$dir/.claude-profile" | tr -d '[:space:]'); break
+    fi
+    dir=$(dirname "$dir")
+  done
+  claude-profile "${name:-default}"
+}
+case "$PROMPT_COMMAND" in
+  *_claude_profile_auto*) ;;
+  "") PROMPT_COMMAND="_claude_profile_auto" ;;
+  *)  PROMPT_COMMAND="_claude_profile_auto;$PROMPT_COMMAND" ;;
+esac
+
+_claude_profile_complete() {
+  local names
+  names="default $(ls -1 "$CLAUDE_PROFILE_HOME" 2>/dev/null | grep -v '^\(bin\|shell\)$' | tr '\n' ' ')"
+  COMPREPLY=( $(compgen -W "$names" -- "${COMP_WORDS[COMP_CWORD]}") )
+}
+complete -F _claude_profile_complete claude-profile
+complete -F _claude_profile_complete claude-handoff
+complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir" claude-sessions
