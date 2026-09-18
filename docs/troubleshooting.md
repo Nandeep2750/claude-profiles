@@ -113,8 +113,8 @@ You have several GitHub accounts and plain `git@github.com:` resolved to the
 wrong one. Use the host alias from your `~/.ssh/config`:
 
 ```sh
-git remote set-url origin github-biztech:nandeep-biztech/claude-profiles.git
-ssh -T github-biztech                 # confirms which identity that alias uses
+git remote set-url origin github-nandeep2750:Nandeep2750/claude-profiles.git
+ssh -T github-nandeep2750                 # confirms which identity that alias uses
 ```
 
 ## Starting over

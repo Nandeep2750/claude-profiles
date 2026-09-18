@@ -26,7 +26,7 @@ a conversation between accounts when one hits its usage limit.
 ## Quick start
 
 ```sh
-git clone git@github.com:nandeep-biztech/claude-profiles.git ~/.claude-tools
+git clone git@github.com:Nandeep2750/claude-profiles.git ~/.claude-tools
 sh ~/.claude-tools/install.sh
 exec $SHELL -l
 ```
@@ -59,20 +59,20 @@ Requires `python3` and [Claude Code](https://claude.com/claude-code) on `PATH`.
 **macOS / Linux / WSL / Git-Bash**
 
 ```sh
-git clone git@github.com:nandeep-biztech/claude-profiles.git ~/.claude-tools
+git clone git@github.com:Nandeep2750/claude-profiles.git ~/.claude-tools
 sh ~/.claude-tools/install.sh
 ```
 
 HTTPS instead, if the machine has no SSH key yet:
 
 ```sh
-git clone https://github.com/nandeep-biztech/claude-profiles.git ~/.claude-tools
+git clone https://github.com/Nandeep2750/claude-profiles.git ~/.claude-tools
 ```
 
 **Native Windows PowerShell**
 
 ```powershell
-git clone https://github.com/nandeep-biztech/claude-profiles.git $HOME\.claude-tools
+git clone https://github.com/Nandeep2750/claude-profiles.git $HOME\.claude-tools
 pwsh -File $HOME\.claude-tools\install.ps1
 ```
 
@@ -87,7 +87,7 @@ somewhere other than `~/.claude-profiles`.
 > whichever identity your `~/.ssh/config` maps to that host. If it resolves to a
 > different account the clone fails with *"Could not read from remote
 > repository"*. Use the matching host alias, e.g.
-> `git clone github-biztech:nandeep-biztech/claude-profiles.git ~/.claude-tools`.
+> `git clone github-nandeep2750:Nandeep2750/claude-profiles.git ~/.claude-tools`.
 
 ## Commands
 
