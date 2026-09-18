@@ -1,5 +1,7 @@
-# profile directories hold credentials + transcripts - never commit
-*/
-!bin/
-!shell/
+# This repo holds tooling only. Account data lives in $CLAUDE_PROFILE_HOME
+# (default ~/.claude-profiles) and is never part of this repo.
+# These entries are a safety net in case anyone relocates data in here.
 .DS_Store
+*.jsonl
+.credentials.json
+.claude.json

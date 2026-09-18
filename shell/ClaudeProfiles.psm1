@@ -3,7 +3,8 @@
 $script:ProfileHome = if ($env:CLAUDE_PROFILE_HOME) { $env:CLAUDE_PROFILE_HOME }
                       else { Join-Path $HOME ".claude-profiles" }
 $script:Py  = (Get-Command python3, python -ErrorAction SilentlyContinue | Select-Object -First 1).Source
-$script:Core = Join-Path $script:ProfileHome "bin\claude-profiles.py"
+$script:ToolsDir = Split-Path -Parent $PSScriptRoot
+$script:Core = Join-Path $script:ToolsDir "bin\claude-profiles.py"
 
 function Set-ClaudeProfile {
     [CmdletBinding()] param([Parameter(Position=0)][string]$Name)
@@ -49,7 +50,7 @@ Set-Alias claude-handoff  Move-ClaudeSession
 Register-ArgumentCompleter -CommandName Set-ClaudeProfile -ParameterName Name -ScriptBlock {
     param($c,$p,$word)
     @("default") + (Get-ChildItem $script:ProfileHome -Directory -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -notin @("bin","shell") } | ForEach-Object Name) |
+        ForEach-Object Name) |
       Where-Object { $_ -like "$word*" } |
       ForEach-Object { [System.Management.Automation.CompletionResult]::new($_,$_,'ParameterValue',$_) }
 }

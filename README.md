@@ -17,18 +17,36 @@ Each profile also gets its own `.claude.json`, `settings.json`, MCP servers and
 session history. Nothing here patches Claude Code - it only sets an env var and
 copies transcript files.
 
+## Two directories, kept apart
+
+| Path | Holds | Synced? |
+|---|---|---|
+| `~/.claude-tools` (this repo) | logic, shell layers, installers | yes - this is what you clone |
+| `~/.claude-profiles` | credentials, transcripts, per-account config | **never** |
+
+Only the tooling is version-controlled. Account data stays machine-local: run
+`/login` once per profile on each machine.
+
+On macOS a profile's Keychain entry is keyed to its **absolute path**, so do not
+move or rename profile directories after logging in - it invalidates the
+credentials and forces a re-login.
+
 ## Install
 
 ```sh
-git clone <your-repo> ~/.claude-profiles     # or copy the folder over
-sh ~/.claude-profiles/install.sh             # macOS, Linux, WSL, Git-Bash
+git clone <your-repo> ~/.claude-tools
+sh ~/.claude-tools/install.sh        # macOS, Linux, WSL, Git-Bash
 ```
 
 Native Windows PowerShell:
 
 ```powershell
-pwsh -File $HOME\.claude-profiles\install.ps1
+pwsh -File $HOME\.claude-tools\install.ps1
 ```
+
+The installer wires a `source` line into your rc file pointing at wherever you
+cloned it - no path is hardcoded. Set `CLAUDE_PROFILE_HOME` first if you want
+account data somewhere other than `~/.claude-profiles`.
 
 Requires `python3` and `claude` on PATH. Restart your shell afterwards.
 The installer backs up any rc file it edits and is safe to re-run.
@@ -80,26 +98,19 @@ cold cache and costs more tokens than a normal continuation.
 ## Layout
 
 ```
-~/.claude-profiles/
+~/.claude-tools/                 <- this repo
   bin/claude-profiles.py         all logic, cross-platform
   shell/claude-profiles.zsh      zsh functions + completion
   shell/claude-profiles.bash     bash functions + completion
   shell/ClaudeProfiles.psm1      PowerShell module
   install.sh  install.ps1
-  <profile-name>/                one dir per account (do NOT commit these)
+
+~/.claude-profiles/              <- account data, machine-local
+  <profile-name>/                one dir per account
 ```
-
-## Syncing to another machine
-
-Commit `bin/`, `shell/`, `install.*` and this README. Never commit the profile
-directories - they hold credentials, session transcripts and machine-local
-config. A `.gitignore` is included that excludes them by default.
-
-Credentials do not transfer: run `/login` once per profile on each machine.
-On macOS the Keychain entry is keyed to the profile's absolute path, so keeping
-the same username/home path across machines avoids surprises.
 
 ## Uninstall
 
-Remove the `source` line from your rc file and delete `~/.claude-profiles`.
+Remove the `source` line from your rc file and delete `~/.claude-tools`.
+Deleting `~/.claude-profiles` additionally logs out every extra account.
 Your original account in `~/.claude` is never touched by any of this.

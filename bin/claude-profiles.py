@@ -2,6 +2,9 @@
 """
 Cross-platform core for Claude Code multi-account profiles.
 
+This file is the tooling (safe to commit). Account data lives separately in
+CLAUDE_PROFILE_HOME (default ~/.claude-profiles) and must never be committed.
+
 Each profile is a CLAUDE_CONFIG_DIR. Claude Code derives a distinct credential
 slot from that path, so profiles stay logged in simultaneously:
   macOS          -> Keychain service "Claude Code-credentials-<sha256(dir)[:8]>"
@@ -15,7 +18,6 @@ HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
 DEFAULT_DIR = os.path.join(HOME, ".claude")
 IS_MAC = sys.platform == "darwin"
-RESERVED = {"bin", "shell"}
 
 
 def profile_dir(name):
@@ -26,7 +28,7 @@ def profile_names():
     out = ["default"]
     if os.path.isdir(PROF_HOME):
         out += sorted(d for d in os.listdir(PROF_HOME)
-                      if d not in RESERVED and os.path.isdir(os.path.join(PROF_HOME, d)))
+                      if not d.startswith(".") and os.path.isdir(os.path.join(PROF_HOME, d)))
     return out
 
 

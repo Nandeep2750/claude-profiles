@@ -1,8 +1,12 @@
 # Claude Code multi-account profiles - bash (Ubuntu/WSL/Git-Bash)
-# Source this from ~/.bashrc:  source ~/.claude-profiles/shell/claude-profiles.bash
+# Source this from ~/.bashrc:  source ~/.claude-tools/shell/claude-profiles.bash
+#
+# CLAUDE_TOOLS_DIR  = this repo (logic, safe to commit)
+# CLAUDE_PROFILE_HOME = account data (credentials, transcripts - never commit)
+CLAUDE_TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 : ${CLAUDE_PROFILE_HOME:="${HOME}/.claude-profiles"}
 export CLAUDE_PROFILE_HOME
-: ${CLAUDE_PROFILE_PY:="${CLAUDE_PROFILE_HOME}/bin/claude-profiles.py"}
+: ${CLAUDE_PROFILE_PY:="${CLAUDE_TOOLS_DIR}/bin/claude-profiles.py"}
 : ${CLAUDE_PY:=$(command -v python3 || command -v python)}
 
 claude-profile() {
@@ -40,7 +44,7 @@ esac
 
 _claude_profile_complete() {
   local names
-  names="default $(ls -1 "$CLAUDE_PROFILE_HOME" 2>/dev/null | grep -v '^\(bin\|shell\)$' | tr '\n' ' ')"
+  names="default $(ls -1 "$CLAUDE_PROFILE_HOME" 2>/dev/null | tr '\n' ' ')"
   COMPREPLY=( $(compgen -W "$names" -- "${COMP_WORDS[COMP_CWORD]}") )
 }
 complete -F _claude_profile_complete claude-profile

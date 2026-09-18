@@ -1,22 +1,24 @@
 #!/usr/bin/env sh
 # Install Claude Code multi-account profiles (macOS / Linux / WSL / Git-Bash).
-# Usage:  sh install.sh
+#
+# Two directories, deliberately separate:
+#   TOOLS  = this repo        -> logic only, safe to commit
+#   DATA   = CLAUDE_PROFILE_HOME (default ~/.claude-profiles)
+#            -> credentials, transcripts, per-account config. Never committed,
+#               never synced. Run /login once per profile on each machine.
+#
+# Usage:  sh install.sh          (installs in place - run it from the clone)
 set -e
-SRC=$(cd "$(dirname "$0")" && pwd)
-DEST="${CLAUDE_PROFILE_HOME:-$HOME/.claude-profiles}"
+TOOLS=$(cd "$(dirname "$0")" && pwd)
+DATA="${CLAUDE_PROFILE_HOME:-$HOME/.claude-profiles}"
 
 command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1 || {
-  echo "error: python3 not found. Install it first (apt install python3 / brew install python)." >&2
-  exit 1; }
+  echo "error: python3 not found (apt install python3 / brew install python)." >&2; exit 1; }
+command -v claude >/dev/null 2>&1 || \
+  echo "warning: 'claude' not on PATH - install Claude Code before using this." >&2
 
-if [ "$SRC" != "$DEST" ]; then
-  mkdir -p "$DEST/bin" "$DEST/shell"
-  cp "$SRC/bin/claude-profiles.py" "$DEST/bin/"
-  cp "$SRC/shell/claude-profiles.zsh" "$SRC/shell/claude-profiles.bash" "$DEST/shell/"
-  [ -f "$SRC/shell/ClaudeProfiles.psm1" ] && cp "$SRC/shell/ClaudeProfiles.psm1" "$DEST/shell/" || true
-  [ -f "$SRC/README.md" ] && cp "$SRC/README.md" "$DEST/" || true
-fi
-chmod +x "$DEST/bin/claude-profiles.py"
+mkdir -p "$DATA"
+chmod +x "$TOOLS/bin/claude-profiles.py" 2>/dev/null || true
 
 add_line() {
   rc="$1"; line="$2"; marker="$3"
@@ -30,15 +32,16 @@ add_line() {
   fi
 }
 
-echo "installing to $DEST"
+echo "tools (this repo): $TOOLS"
+echo "account data     : $DATA"
 if [ -f "$HOME/.zshrc" ] || [ -n "$ZSH_VERSION" ]; then
-  add_line "$HOME/.zshrc"  "source \"$DEST/shell/claude-profiles.zsh\"" "claude-profiles.zsh"
+  add_line "$HOME/.zshrc"  "source \"$TOOLS/shell/claude-profiles.zsh\""  "claude-profiles.zsh"
 fi
 if [ -f "$HOME/.bashrc" ] || [ -n "$BASH_VERSION" ]; then
-  add_line "$HOME/.bashrc" "source \"$DEST/shell/claude-profiles.bash\"" "claude-profiles.bash"
+  add_line "$HOME/.bashrc" "source \"$TOOLS/shell/claude-profiles.bash\"" "claude-profiles.bash"
 fi
 
 echo
-echo "done. restart your shell (or: exec \$SHELL -l), then:"
+echo "done. restart your shell, then:"
 echo "  claude-profiles                  list profiles"
-echo "  claude-profile work && claude    log a 2nd account in via /login"
+echo "  claude-profile work && claude    add an account via /login"

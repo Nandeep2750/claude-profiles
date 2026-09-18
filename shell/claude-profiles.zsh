@@ -1,8 +1,12 @@
 # Claude Code multi-account profiles - zsh
-# Source this from ~/.zshrc:  source ~/.claude-profiles/shell/claude-profiles.zsh
+# Source this from ~/.zshrc:  source ~/.claude-tools/shell/claude-profiles.zsh
+#
+# CLAUDE_TOOLS_DIR  = this repo (logic, safe to commit)
+# CLAUDE_PROFILE_HOME = account data (credentials, transcripts - never commit)
+CLAUDE_TOOLS_DIR="${${(%):-%x}:A:h:h}"          # derived from this file's location
 : ${CLAUDE_PROFILE_HOME:="${HOME}/.claude-profiles"}
 export CLAUDE_PROFILE_HOME
-: ${CLAUDE_PROFILE_PY:="${CLAUDE_PROFILE_HOME}/bin/claude-profiles.py"}
+: ${CLAUDE_PROFILE_PY:="${CLAUDE_TOOLS_DIR}/bin/claude-profiles.py"}
 : ${CLAUDE_PY:=$(command -v python3 || command -v python)}
 
 claude-profile() {
@@ -48,7 +52,7 @@ zstyle ':completion:*:descriptions' format '%F{yellow}%d%f'
 
 _claude_profile_names() {
   local -a names
-  names=( default ${(f)"$(ls -1 "$CLAUDE_PROFILE_HOME" 2>/dev/null | grep -v '^\(bin\|shell\)$')"} )
+  names=( default ${(f)"$(ls -1 "$CLAUDE_PROFILE_HOME" 2>/dev/null)"} )
   _describe -t profiles 'claude profile' names
 }
 compdef _claude_profile_names claude-profile
