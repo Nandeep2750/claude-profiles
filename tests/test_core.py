@@ -18,8 +18,13 @@ def _read_json(path):
 
 def load_core(home, profile_home=None, config_dir=None):
     """Import the core fresh with HOME pointed at a fixture."""
+    # expanduser("~") reads HOME on POSIX but USERPROFILE on Windows - set both,
+    # and clear HOMEDRIVE/HOMEPATH which Windows consults before HOME.
     os.environ["HOME"] = home
-    os.environ["USER"] = os.environ.get("USER", "tester")
+    os.environ["USERPROFILE"] = home
+    os.environ.pop("HOMEDRIVE", None)
+    os.environ.pop("HOMEPATH", None)
+    os.environ["USER"] = os.environ.get("USER") or os.environ.get("USERNAME") or "tester"
     os.environ["CLAUDE_PROFILE_HOME"] = profile_home or os.path.join(home, ".claude-profiles")
     os.environ.pop("CLAUDE_CONFIG_DIR", None)
     if config_dir:
@@ -29,6 +34,11 @@ def load_core(home, profile_home=None, config_dir=None):
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
+
+
+def encode_dir(path):
+    """Claude Code's projects/ directory name for a working directory."""
+    return "-" + path.replace(os.sep, "-").replace("/", "-").replace(".", "-").strip("-")
 
 
 def transcript(path, cwd, prompts, branch="main"):
@@ -182,7 +192,7 @@ class TestSessions(Fixture):
         super().setUp()
         self.proj = os.path.join(self.home, "code", "api")
         os.makedirs(self.proj, exist_ok=True)
-        enc = "-" + self.proj.strip("/").replace("/", "-").replace(".", "-")
+        enc = encode_dir(self.proj)
         transcript(os.path.join(self.home, ".claude", "projects", enc, "aaa11111-0000-0000-0000-000000000000.jsonl"),
                    self.proj, ["fix the auth bug", "and the tests"])
         transcript(os.path.join(self.home, ".claude", "projects", enc, "bbb22222-0000-0000-0000-000000000000.jsonl"),
@@ -233,7 +243,7 @@ class TestHandoff(Fixture):
         super().setUp()
         self.proj = os.path.join(self.home, "code", "api")
         os.makedirs(self.proj, exist_ok=True)
-        enc = "-" + self.proj.strip("/").replace("/", "-").replace(".", "-")
+        enc = encode_dir(self.proj)
         self.enc = enc
         transcript(os.path.join(self.home, ".claude", "projects", enc, "aaa11111-0000-0000-0000-000000000000.jsonl"),
                    self.proj, ["fix the auth bug"])
