@@ -93,6 +93,7 @@ cached value rather than breaking the table.
 | `claude-profile-exec NAME CMD` | Run one command under a profile without switching |
 | `claude-profile-clone SRC DST` | Seed a profile's settings from another one |
 | `claude-doctor` | Check the installation for problems |
+| `claude-update` | Check for and pull a newer version |
 | `claude-auto` | Launch Claude on whichever account has the most room |
 | `claude-best` | Which account has the most headroom |
 | `claude-prune` | Delete old transcripts (dry run by default) |
@@ -171,6 +172,17 @@ and conversation history are all per-profile, and nothing is inherited from
 > [!WARNING]
 > On macOS a profile's Keychain entry is keyed to its **absolute path**. Moving
 > or renaming a profile directory after logging in invalidates its credentials.
+
+## Updating
+
+```sh
+claude-update --check    # what is installed, and what is available
+claude-update            # pull the newer version
+```
+
+It tells you whether the change needs a shell restart, refuses to run over local
+edits, and never touches your account data.
+[More →](https://nandeep2750.github.io/claude-profiles/updating/)
 
 ## Settings
 

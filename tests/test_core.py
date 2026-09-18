@@ -370,6 +370,27 @@ class TestBest(Fixture):
         self.assertIn("no signed-in profile", err)
 
 
+class TestUpdate(Fixture):
+    def test_version_comparison(self):
+        v = self.core._vtuple
+        self.assertGreater(v("1.2.0"), v("1.1.9"))
+        self.assertGreater(v("2.0.0"), v("1.99.99"))
+        self.assertEqual(v("1.1.0"), v("1.1.0"))
+        self.assertGreater(v("v1.1.0".lstrip("v")), v("1.0.9"))
+
+    def test_version_comparison_survives_junk(self):
+        self.assertEqual(self.core._vtuple("not-a-version"), (0,))
+
+    def test_installed_version_includes_the_number(self):
+        self.assertIn(self.core.__version__, self.core.installed_version())
+
+    def test_check_does_not_modify_anything(self):
+        before = sorted(os.listdir(self.ph))
+        code, _, _ = self.run_cmd("update", "--check")
+        self.assertIn(code, (0, 1))            # 1 if GitHub is unreachable
+        self.assertEqual(sorted(os.listdir(self.ph)), before)
+
+
 class TestHandoff(Fixture):
     def setUp(self):
         super().setUp()

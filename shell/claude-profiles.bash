@@ -22,7 +22,7 @@ claude-profile() {
 # `claude-profiles` with no subcommand means `status`; anything else passes through.
 claude-profiles() {
   case "$1" in
-    status|sessions|handoff|remove|doctor|path|clone|prune|best) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
+    status|sessions|handoff|remove|doctor|path|clone|prune|best|update) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
     *)                                          "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@" ;;
   esac
 }
@@ -30,6 +30,8 @@ claude-doctor()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" doctor "$@"; }
 claude-profile-clone() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clone "$@"; }
 claude-prune()    { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" prune "$@"; }
 claude-best()     { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" best  "$@"; }
+claude-update()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" update "$@"; }
+claude-version()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" --version; }
 
 # Launch claude on whichever signed-in account has the most headroom.
 claude-auto() {
@@ -112,4 +114,5 @@ complete -F _claude_profile_complete claude-profile-clone
 complete -F _claude_profile_complete claude-handoff
 complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir --plain -g --grep" claude-sessions
 complete -W "-o --older-than -p --profile -n --limit -y --yes --plain" claude-prune
-complete -W "status doctor sessions handoff remove clone prune best path --live --dirs --no-usage --plain" claude-profiles
+complete -W "-c --check" claude-update
+complete -W "status doctor sessions handoff remove clone prune best update path --live --dirs --no-usage --plain" claude-profiles

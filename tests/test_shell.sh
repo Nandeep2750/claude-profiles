@@ -29,7 +29,7 @@ printf 'shell layer (%s)\n' "$SH_NAME"
 for fn in claude-profile claude-profiles claude-sessions claude-handoff \
           claude-profile-remove claude-doctor claude-profile-exec \
           claude-profile-clone claude_profile_prompt claude-prune \
-          claude-best claude-auto; do
+          claude-best claude-auto claude-update claude-version; do
   if command -v "$fn" >/dev/null 2>&1; then ok "$fn is defined"; else bad "$fn is defined" "defined" "missing"; fi
 done
 
@@ -105,7 +105,7 @@ claude-profile-clone work fresh >/dev/null 2>&1
   || ok "clone never copies credentials"
 
 # new subcommands dispatch through claude-profiles
-for sub in prune best clone; do
+for sub in prune best clone update; do
   claude-profiles "$sub" --help >/dev/null 2>&1 \
     && ok "claude-profiles $sub dispatches" \
     || bad "claude-profiles $sub dispatches" "exit 0" "non-zero"

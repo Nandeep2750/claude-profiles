@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-09-18
+
+### Added
+
+- **`claude-update`** — reports the installed and latest versions, pulls the
+  newer one with `git pull --ff-only`, lists what changed, and says whether the
+  change needs a shell restart. Refuses to run over uncommitted local edits.
+- **`claude-update --check`** — report only, change nothing.
+- `--version` and `claude-doctor` now include the git description, so
+  `1.2.0 (v1.2.0-3-gabc1234)` tells you exactly what you are running.
+
 ## [1.1.0] - 2026-09-18
 
 ### Added
@@ -54,5 +65,6 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.2.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.0.0

@@ -15,7 +15,7 @@ Subcommands: path | status | sessions | handoff | remove
 import argparse, concurrent.futures, datetime, hashlib, json, os, re, shutil, subprocess, sys, textwrap, time
 import urllib.error, urllib.request
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -109,6 +109,9 @@ def usage_of(pdir):
 
 
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+REPO = "Nandeep2750/claude-profiles"
+RELEASES_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
+TOOLS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def access_token(pdir):
@@ -816,6 +819,90 @@ def cmd_best(a):
     return 0
 
 
+def _git(*args, cwd=None):
+    try:
+        r = subprocess.run(["git", *args], cwd=cwd or TOOLS_DIR,
+                           capture_output=True, text=True, timeout=30)
+        return r.returncode, r.stdout.strip(), r.stderr.strip()
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def installed_version():
+    """Version string, with the git description when the checkout has one."""
+    code, out, _ = _git("describe", "--tags", "--always", "--dirty")
+    return f"{__version__} ({out})" if code == 0 and out else __version__
+
+
+def latest_release(timeout=6):
+    """Newest published tag on GitHub, or None."""
+    req = urllib.request.Request(RELEASES_URL, headers={
+        "Accept": "application/vnd.github+json", "User-Agent": "claude-profiles"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return (json.loads(r.read().decode()).get("tag_name") or "").lstrip("v") or None
+    except Exception:
+        return None
+
+
+def _vtuple(v):
+    return tuple(int(x) for x in re.findall(r"\d+", v)[:3]) or (0,)
+
+
+def cmd_update(a):
+    C = color()
+    D = lambda t: C(t, "dim")
+    print(f"installed: {C(installed_version(), 'cy')}")
+
+    latest = latest_release()
+    if latest is None:
+        print(D("could not reach GitHub to check for a newer release"))
+    else:
+        if _vtuple(latest) > _vtuple(__version__):
+            print(f"available: {C(latest, 'gr')}  "
+                  + D(f"https://github.com/{REPO}/releases/tag/v{latest}"))
+        else:
+            print(f"available: {latest}  " + D("(you are up to date)"))
+
+    if a.check:
+        return 0
+
+    if not os.path.isdir(os.path.join(TOOLS_DIR, ".git")):
+        print(f"\n{TOOLS_DIR.replace(HOME, '~')} is not a git checkout - "
+              "update it the same way you installed it", file=sys.stderr)
+        return 1
+
+    code, dirty, _ = _git("status", "--porcelain")
+    if code == 0 and dirty:
+        print(C("\nlocal changes present - commit or stash them first:", "yl"))
+        print(D("  " + "\n  ".join(dirty.splitlines()[:10])))
+        return 1
+
+    before = _git("rev-parse", "--short", "HEAD")[1]
+    print(D("\ngit pull --ff-only"))
+    code, out, err = _git("pull", "--ff-only")
+    if code != 0:
+        print(err or out, file=sys.stderr)
+        return 1
+    after = _git("rev-parse", "--short", "HEAD")[1]
+
+    if before == after:
+        print("already at the newest commit")
+        return 0
+
+    _, log, _ = _git("log", "--oneline", f"{before}..{after}")
+    print(f"\n{before} -> {after}")
+    for line in log.splitlines()[:15]:
+        print("  " + line)
+
+    _, changed, _ = _git("diff", "--name-only", before, after)
+    if any(f.startswith("shell/") for f in changed.splitlines()):
+        print(C("\nthe shell layer changed - run 'exec $SHELL -l' or open a new terminal", "yl"))
+    else:
+        print(D("\nonly the core changed - no shell restart needed"))
+    return 0
+
+
 def cmd_doctor(a):
     C = color()
     issues, warns = [], []
@@ -825,6 +912,7 @@ def cmd_doctor(a):
     def bad(msg):   print(f"  {C('FAIL', 'rd')} {msg}"); issues.append(msg)
 
     print(C("environment", "b"))
+    ok(f"claude-profiles {installed_version()}")
     for tool in ("python3", "claude"):
         path = shutil.which(tool)
         ok(f"{tool} found at {path}") if path else bad(f"{tool} is not on PATH")
@@ -946,6 +1034,11 @@ def main():
     p.add_argument("-g", "--grep", metavar="PATTERN",
                    help="only sessions containing PATTERN (case-insensitive regex)")
     p.set_defaults(fn=cmd_sessions)
+
+    p = sub.add_parser("update", help="check for and pull a newer version")
+    p.add_argument("-c", "--check", action="store_true",
+                   help="only report, do not pull")
+    p.set_defaults(fn=cmd_update)
 
     p = sub.add_parser("prune", help="delete old conversation transcripts")
     p.add_argument("-o", "--older-than", type=int, default=90, metavar="DAYS",

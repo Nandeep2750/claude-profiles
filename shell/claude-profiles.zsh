@@ -22,7 +22,7 @@ claude-profile() {
 # `claude-profiles` with no subcommand means `status`; anything else passes through.
 claude-profiles() {
   case "$1" in
-    status|sessions|handoff|remove|doctor|path|clone|prune|best) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
+    status|sessions|handoff|remove|doctor|path|clone|prune|best|update) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
     *)                                          "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@" ;;
   esac
 }
@@ -30,6 +30,8 @@ claude-doctor()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" doctor "$@" }
 claude-profile-clone() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clone "$@" }
 claude-prune()    { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" prune "$@" }
 claude-best()     { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" best  "$@" }
+claude-update()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" update "$@" }
+claude-version()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" --version }
 
 # Launch claude on whichever signed-in account has the most headroom.
 claude-auto() {
@@ -149,6 +151,8 @@ _claude_prune() {
     '--plain[no borders]'
 }
 compdef _claude_prune claude-prune
+_claude_update() { _arguments '(-c --check)'{-c,--check}'[only report, do not pull]' }
+compdef _claude_update claude-update
 compdef _claude_sessions claude-sessions
 
 _claude_profiles() {
@@ -158,6 +162,7 @@ _claude_profiles() {
           sessions:'list conversations' handoff:'copy a session to another profile'
           remove:'delete a profile' clone:'copy settings between profiles'
           prune:'delete old transcripts' best:'which account has the most headroom'
+          update:'check for and pull a newer version'
           path:'print a profile config dir')
     _describe -t commands 'subcommand' subs && return
   fi

@@ -51,6 +51,7 @@ nav:
   - Reference:
       - Commands: commands.md
       - Settings: settings.md
+      - Updating: updating.md
       - What's shared, what isn't: isolation.md
       - How it works: how-it-works.md
   - Troubleshooting: troubleshooting.md

@@ -16,6 +16,7 @@ scripts, or on a shell with no wrapper installed.
 | `claude-doctor` | `claude-profiles.py doctor` |
 | `claude-prune` | `claude-profiles.py prune` |
 | `claude-best` | `claude-profiles.py best` |
+| `claude-update` | `claude-profiles.py update` |
 | `claude-auto` | *(shell only)* |
 | - | `claude-profiles.py path NAME` |
 
