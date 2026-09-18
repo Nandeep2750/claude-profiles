@@ -37,8 +37,16 @@ def load_core(home, profile_home=None, config_dir=None):
 
 
 def encode_dir(path):
-    """Claude Code's projects/ directory name for a working directory."""
-    return "-" + path.replace(os.sep, "-").replace("/", "-").replace(".", "-").strip("-")
+    """A projects/ directory name for a working directory.
+
+    Mirrors Claude Code's scheme (separators and dots become dashes). The colon
+    in a Windows drive letter is also replaced, since ':' is illegal in a
+    Windows filename. The core never constructs these names - it reuses whatever
+    directory a transcript already lives in - so this only has to be legal and
+    consistent within the tests.
+    """
+    return "-" + (path.replace(os.sep, "-").replace("/", "-")
+                      .replace(":", "-").replace(".", "-").strip("-"))
 
 
 def transcript(path, cwd, prompts, branch="main"):
