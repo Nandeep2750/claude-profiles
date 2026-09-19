@@ -44,16 +44,16 @@ is "default clears CLAUDE_PROFILE_NAME" "" "${CLAUDE_PROFILE_NAME:-}"
 is "default clears CLAUDE_CONFIG_DIR"   "" "${CLAUDE_CONFIG_DIR:-}"
 
 # marker walk-up
-mkdir -p "$HOME/projects/acme/api/src" "$HOME/projects/other"
-echo work > "$HOME/projects/acme/.claude-profile"
+mkdir -p "$HOME/projects/sample-project/api/src" "$HOME/projects/other"
+echo work > "$HOME/projects/sample-project/.claude-profile"
 mkdir -p "$CLAUDE_PROFILE_HOME/solo"
-echo solo > "$HOME/projects/acme/api/.claude-profile"
+echo solo > "$HOME/projects/sample-project/api/.claude-profile"
 
-cd "$HOME/projects/acme" || exit 1
+cd "$HOME/projects/sample-project" || exit 1
 _claude_profile_last_pwd=force; _claude_profile_auto
 is "marker selects its profile" "work" "${CLAUDE_PROFILE_NAME:-}"
 
-cd "$HOME/projects/acme/api/src" || exit 1
+cd "$HOME/projects/sample-project/api/src" || exit 1
 _claude_profile_last_pwd=force; _claude_profile_auto
 is "nearest marker wins over an ancestor" "solo" "${CLAUDE_PROFILE_NAME:-}"
 
@@ -72,7 +72,7 @@ claude-profile default >/dev/null
 
 # a marker still wins over the configured default
 export CLAUDE_DEFAULT_PROFILE=fallback   # read by the cd hook
-cd "$HOME/projects/acme" || exit 1
+cd "$HOME/projects/sample-project" || exit 1
 _claude_profile_last_pwd=force; _claude_profile_auto
 is "a marker beats CLAUDE_DEFAULT_PROFILE" "work" "${CLAUDE_PROFILE_NAME:-}"
 unset CLAUDE_DEFAULT_PROFILE

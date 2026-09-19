@@ -1,6 +1,32 @@
 # Command reference
 
-Four shell commands wrap one cross-platform Python core
+## At a glance
+
+| Command | Does |
+|---|---|
+| [`claude-profile NAME`](#claude-profile-name) | Switch this shell to a profile, creating it if needed |
+| [`claude-profiles`](#claude-profiles) | Every profile, its account, and how much of its limits are used |
+| [`claude-profiles --live`](#live-figures) | The same, with current figures instead of the cache |
+| [`claude-sessions`](#claude-sessions-options) | List conversations readably |
+| [`claude-sessions --grep`](#searching-your-conversations) | Search every message across every account |
+| [`claude-handoff NAME`](#claude-handoff-target-session) | Copy a conversation to another account and continue there |
+| [`claude-best`](#claude-best) | Which account has the most headroom |
+| [`claude-auto`](#claude-auto) | Launch Claude on that account automatically |
+| [`claude-profile-exec`](#claude-profile-exec-profile-command-args) | Run one command under a profile without switching |
+| [`claude-profile-clone`](#claude-profile-clone-source-target) | Seed a new profile's settings from an existing one |
+| [`claude-profile-remove`](#claude-profile-remove-name) | Delete a profile, its history and its credentials |
+| [`claude-prune`](#claude-prune) | Delete old transcripts (dry run by default) |
+| [`claude-doctor`](#claude-profiles-doctor) | Check the installation for problems |
+| [`claude-update`](#claude-update) | Check for and pull a newer version |
+
+Names used throughout these examples - `default`, `work`, `client` - are
+placeholders. Profiles can be called anything.
+
+---
+
+## How the commands are built
+
+Shell commands wrap one cross-platform Python core
 (`bin/claude-profiles.py`). The core can also be called directly - useful in
 scripts, or on a shell with no wrapper installed.
 
@@ -216,7 +242,7 @@ opening prompt. Sessions that match show the matching passage in place of the
 summary, with surrounding context:
 
 ```
-│ 1 │ proofed │ 0m ago │ 55 │ eb82f424… │ ~ │ …gives each profile its own macOS Keychain… │
+│ 1 │ work    │ 0m ago │ 55 │ eb82f424… │ ~ │ …gives each profile its own macOS Keychain… │
 ```
 
 The pattern is a case-insensitive regular expression, so `-g "auth|login"` works.
@@ -239,7 +265,7 @@ for; this section is the mechanics.
 claude-handoff work               # this directory's most recent conversation
 claude-handoff work 0a9014e8      # a specific one - a prefix is enough
 claude-handoff work -s client     # take it from "client" instead of the active profile
-claude-handoff work -d ~/code/api # conversations belonging to another directory
+claude-handoff work -d ~/projects/<project-name>/api # conversations belonging to another directory
 ```
 
 | Argument | Meaning |
@@ -254,7 +280,7 @@ On success it prints the resume command:
 ```
 handed off session 0a9014e8-8806-43cf-98fd-28fad1353923
   from: default   to: work
-  dir : ~/Projects/Acme/api
+  dir : ~/projects/<project-name>/api
 
   claude-profile work && claude --resume 0a9014e8-8806-43cf-98fd-28fad1353923
 ```
@@ -291,7 +317,7 @@ keychain
   FAIL Claude Code-credentials-1a2b3c4d is orphaned - no profile maps to it
 
 project markers
-  ok   ~/Projects/Acme/.claude-profile -> work
+  ok   ~/projects/<project-name>/.claude-profile -> work
 
 1 problem(s), 1 warning(s)
 ```
@@ -358,8 +384,8 @@ refuses unknown names, listing what is available instead.
 Names the signed-in account with the most headroom.
 
 ```
-  -> proofed      5% used  (5h 5%, 7d 2%)
-     biztech      32% used (5h 32%, 7d 17%)
+  -> work         5% used  (5h 5%, 7d 2%)
+     client      32% used  (5h 32%, 7d 17%)
 ```
 
 A profile is judged by its **tightest** limit, not its average - an account at
@@ -410,7 +436,7 @@ claude-prune -o 90 --yes          # actually delete
 ╭────────┬─────────┬──────────────────────────────────────┬─────────────────────────────────╮
 │ WHEN   │ PROFILE │ SESSION ID                           │ DIRECTORY                       │
 ├────────┼─────────┼──────────────────────────────────────┼─────────────────────────────────┤
-│ Aug 19 │ default │ a6c22511-53a7-4a10-8e16-104b79f2dc17 │ ~/Projects/Acme/api             │
+│ Aug 19 │ default │ a6c22511-53a7-4a10-8e16-104b79f2dc17 │ ~/projects/<project-name>/api             │
 ╰────────┴─────────┴──────────────────────────────────────┴─────────────────────────────────╯
 
 3 session(s) older than 90 days, 2.3MB  (90 newer session(s) untouched)
@@ -476,6 +502,25 @@ and the command tells you what it skipped.
     They live in `.claude.json` alongside account identity, so copying that file
     would carry the wrong account with it. Re-add them under the new profile:
     `claude-profile work && claude mcp add ...`
+
+---
+
+## `claude-update`
+
+Check for and pull a newer version. Covered in full on the
+[Updating](updating.md) page.
+
+```sh
+claude-update --check    # what is installed, and what is available
+claude-update            # pull it
+```
+
+| Flag | Effect |
+|---|---|
+| `-c`, `--check` | report only, change nothing |
+
+It refuses to run over uncommitted local edits, uses `git pull --ff-only`, and
+tells you whether the change needs a shell restart.
 
 ---
 

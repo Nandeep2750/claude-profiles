@@ -114,10 +114,10 @@ Drop a marker file anywhere in a project tree — the nearest one wins, walking
 up from the current directory:
 
 ```sh
-echo work > ~/Projects/Acme/.claude-profile     # covers every repo under Acme/
+echo work > ~/projects/<project-name>/.claude-profile     # covers every repo under <project-name>/
 ```
 
-Now `cd` anywhere under `~/Projects/Acme` selects the `work` account
+Now `cd` anywhere under `~/projects/<project-name>` selects the `work` account
 automatically. Everywhere else falls back to `default`.
 [More →](https://nandeep2750.github.io/claude-profiles/guides/per-project/)
 

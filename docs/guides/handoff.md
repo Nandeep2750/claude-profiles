@@ -24,7 +24,7 @@ prints the command to continue it:
 ```
 handed off session 0a9014e8-8806-43cf-98fd-28fad1353923
   from: default   to: work
-  dir : ~/Projects/Acme/api
+  dir : ~/projects/<project-name>/api
 
   claude-profile work && claude --resume 0a9014e8-8806-43cf-98fd-28fad1353923
 ```
@@ -48,14 +48,14 @@ Run it from the folder you were working in. It finds the conversation by which
 folder it belongs to.
 
 ```sh
-cd ~/Projects/Acme/api
+cd ~/projects/<project-name>/api
 claude-handoff work
 ```
 
 If you are somewhere else, point at the directory explicitly:
 
 ```sh
-claude-handoff work -d ~/Projects/Acme/api
+claude-handoff work -d ~/projects/<project-name>/api
 ```
 
 ## Picking a specific conversation
@@ -83,10 +83,10 @@ An ambiguous prefix lists the candidates rather than guessing.
 ## What actually gets copied
 
 ```
-~/.claude/projects/-Users-jane-Projects-api/0a9014e8….jsonl
+~/.claude/projects/<encoded-dir>/<session-id>.jsonl
         |  copy, preserving the encoded directory name
         v
-~/.claude-profiles/work/projects/-Users-jane-Projects-api/0a9014e8….jsonl
+~/.claude-profiles/work/projects/<encoded-dir>/<session-id>.jsonl
 ```
 
 Only the profile root changes. The file is byte-for-byte identical, so every

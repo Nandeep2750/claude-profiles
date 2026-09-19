@@ -4,14 +4,14 @@ Put a `.claude-profile` file containing a profile name anywhere in a project
 tree. The nearest one wins, walking up from the current directory.
 
 ```sh
-echo work > ~/Projects/Acme/.claude-profile
+echo work > ~/projects/<project-name>/.claude-profile
 ```
 
-Now `cd` anywhere under `~/Projects/Acme` selects the `work` profile
+Now `cd` anywhere under `~/projects/<project-name>` selects the `work` profile
 automatically:
 
 ```sh
-cd ~/Projects/Acme/api
+cd ~/projects/<project-name>/api
 claude-profile
 ```
 
@@ -28,7 +28,7 @@ Because the walk goes *upward*, a single marker above a group of repos covers
 all of them:
 
 ```
-~/Projects/Acme/
+~/projects/<project-name>/
   .claude-profile        <- contains "work"
   api/                   -> work
   web/                   -> work
@@ -43,7 +43,7 @@ gitignored.
 A marker deeper in the tree wins over one higher up:
 
 ```
-~/Projects/Acme/
+~/projects/<project-name>/
   .claude-profile        <- "work"
   api/
   experiment/
@@ -66,7 +66,7 @@ which would add noticeable latency to every `cd`.
 ## Troubleshooting
 
 ```sh
-cat ~/Projects/Acme/.claude-profile   # should contain just the profile name
+cat ~/projects/<project-name>/.claude-profile   # should contain just the profile name
 claude-profile                        # what is active right now?
 ```
 

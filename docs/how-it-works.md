@@ -82,7 +82,7 @@ The directory name encodes the working directory by replacing `/` and `.` with
 `-`:
 
 ```
-/Users/jane.doe/Projects/api  ->  -Users-jane-doe-Projects-api
+~/projects/<project-name>  ->  -Users-you-projects-<project-name>
 ```
 
 Each `.jsonl` line is one event: user messages, assistant messages, tool calls,
@@ -97,10 +97,10 @@ conversation, it genuinely cannot see the file.
 ## What handoff actually does
 
 ```
-~/.claude/projects/-Users-jane-Projects-api/0a9014e8….jsonl
+~/.claude/projects/<encoded-dir>/<session-id>.jsonl
         |  copy, preserving the encoded directory name
         v
-~/.claude-profiles/work/projects/-Users-jane-Projects-api/0a9014e8….jsonl
+~/.claude-profiles/work/projects/<encoded-dir>/<session-id>.jsonl
 ```
 
 Only the profile root changes. The encoded directory segment is identical, and

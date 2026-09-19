@@ -41,7 +41,7 @@ Anything stored **inside a project folder** is shared, because it belongs to the
 repo rather than to your account.
 
 ```
-~/Projects/Acme/api/
+~/projects/<project-name>/api/
   .mcp.json      <- every profile reads this
   CLAUDE.md      <- every profile reads this
   .claude/       <- every profile reads this

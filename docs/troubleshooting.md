@@ -61,7 +61,7 @@ the conversation belongs to.
 
 ```sh
 claude-sessions -a                   # every directory, to find where it lives
-claude-handoff work -d ~/code/api    # or point at the directory explicitly
+claude-handoff work -d ~/projects/<project-name>/api    # or point at the directory explicitly
 ```
 
 Note the profile matters too: if a directory has a `.claude-profile` marker,
@@ -91,7 +91,7 @@ head -3 ~/.claude/projects/*/*.jsonl | python3 -m json.tool
 ## The `cd` auto-switch is not firing
 
 ```sh
-cat ~/Projects/Acme/.claude-profile   # should contain just the profile name
+cat ~/projects/<project-name>/.claude-profile   # should contain just the profile name
 claude-profile                        # what is active right now?
 ```
 
