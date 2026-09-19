@@ -77,6 +77,20 @@ pass more characters.
 claude-handoff work 0a90            # instead of: claude-handoff work 0
 ```
 
+## Everything worked yesterday and now something is off
+
+If `claude-sessions` returns nothing, or `--live` stops working after a Claude
+Code update, check whether Claude Code changed something this tool reads:
+
+```sh
+claude-doctor --check-upstream
+```
+
+That reads one of your real transcripts and calls the usage endpoint once. A
+`FAIL` there means the format changed - please
+[open an issue](https://github.com/Nandeep2750/claude-profiles/issues) with the
+output.
+
 ## Summaries are blank or the listing looks wrong
 
 `claude-sessions` parses Claude Code's transcript format, which is internal and

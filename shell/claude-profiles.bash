@@ -133,4 +133,5 @@ complete -F _claude_profile_complete claude-handoff
 complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir --plain -g --grep" claude-sessions
 complete -W "-o --older-than -p --profile -n --limit -y --yes --plain" claude-prune
 complete -W "-c --check" claude-update
+complete -W "-u --check-upstream" claude-doctor
 complete -W "status doctor sessions handoff remove clone prune best update path --live --dirs --no-usage --plain" claude-profiles

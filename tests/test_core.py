@@ -580,6 +580,62 @@ class TestStatusline(Fixture):
             self.assertIn("statusline", json.load(fh)["statusLine"]["command"])
 
 
+class TestUpstreamChecks(Fixture):
+    """These guard the two Claude Code internals this tool depends on."""
+
+    def write(self, *lines):
+        d = os.path.join(self.home, ".claude", "projects", "-x")
+        os.makedirs(d, exist_ok=True)
+        p = os.path.join(d, "up11111-0000-0000-0000-000000000000.jsonl")
+        with open(p, "w") as fh:
+            for o in lines:
+                fh.write(json.dumps(o) + "\n")
+        return p
+
+    def test_current_format_passes(self):
+        self.write({"type": "user", "cwd": "/x", "message": {"content": "hi"}})
+        ok, detail = self.core.check_transcript_format()
+        self.assertTrue(ok, detail)
+
+    def test_a_renamed_field_is_caught(self):
+        self.write({"type": "user", "cwd": "/x", "payload": {"content": "hi"}})
+        ok, detail = self.core.check_transcript_format()
+        self.assertFalse(ok)
+        self.assertIn("message", detail)
+
+    def test_unreadable_user_messages_are_caught(self):
+        self.write({"type": "assistant", "cwd": "/x", "message": {"content": "hi"}})
+        ok, detail = self.core.check_transcript_format()
+        self.assertFalse(ok)
+        self.assertIn("no user messages", detail)
+
+    def test_no_transcripts_is_not_a_failure(self):
+        ok, detail = self.core.check_transcript_format()
+        self.assertIsNone(ok)
+
+    def test_missing_usage_fields_are_caught(self):
+        self.core.fetch_live = lambda pdir, timeout=6: (None, "no usage in response")
+        ok, detail = self.core.check_usage_endpoint()
+        self.assertFalse(ok)
+        self.assertIn("no longer has the fields", detail)
+
+    def test_a_transient_failure_is_not_reported_as_a_breakage(self):
+        for why in ("rate limited", "unreachable", "token expired"):
+            self.core.fetch_live = lambda pdir, timeout=6, w=why: (None, w)
+            ok, detail = self.core.check_usage_endpoint()
+            self.assertIsNone(ok, f"{why} should warn, not fail")
+
+    def test_a_good_response_passes(self):
+        self.core.fetch_live = lambda pdir, timeout=6: (
+            {"5h": {"pct": 1}, "7d": {"pct": 2}, "age": 0, "live": True}, "")
+        ok, detail = self.core.check_usage_endpoint()
+        self.assertTrue(ok, detail)
+
+    def test_doctor_does_not_check_upstream_unless_asked(self):
+        code, out, _ = self.run_cmd("doctor")
+        self.assertNotIn("claude code integration", out)
+
+
 class TestHandoff(Fixture):
     def setUp(self):
         super().setUp()

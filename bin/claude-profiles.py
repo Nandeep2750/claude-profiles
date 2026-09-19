@@ -26,7 +26,7 @@ import time
 import urllib.error
 import urllib.request
 
-__version__ = "1.6.0"
+__version__ = "1.7.0"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -1198,6 +1198,72 @@ def cmd_statusline(a):
     return 0
 
 
+# Fields this tool relies on. Both come from Claude Code internals that are not
+# a documented API, so they are worth checking against real data now and then.
+TRANSCRIPT_FIELDS = ("type", "cwd", "message")
+USAGE_BUCKETS = ("five_hour", "seven_day")
+
+
+def check_transcript_format():
+    """Parse a real transcript and confirm the fields we depend on are present.
+
+    Returns (ok, detail). ok is None when there was nothing to check.
+    """
+    newest, newest_at = None, 0
+    for name in profile_names():
+        for f in transcripts(name):
+            try:
+                mtime = os.path.getmtime(f)
+            except OSError:
+                continue
+            if mtime > newest_at:
+                newest, newest_at = f, mtime
+    if not newest:
+        return None, "no transcripts on this machine yet"
+
+    seen, users = set(), 0
+    try:
+        with open(newest, errors="replace") as fh:
+            for line in fh:
+                try:
+                    o = json.loads(line)
+                except ValueError:
+                    continue
+                seen.update(o.keys())
+                if o.get("type") == "user" and _text((o.get("message") or {}).get("content")):
+                    users += 1
+    except OSError as e:
+        return False, f"could not read {newest}: {e}"
+
+    missing = [f for f in TRANSCRIPT_FIELDS if f not in seen]
+    where = os.path.basename(newest)
+    if missing:
+        return False, f"{where} has no {', '.join(missing)} - claude-sessions will misread it"
+    if users == 0:
+        return False, f"{where} parsed, but no user messages were recognised"
+    return True, f"{where}: {users} message(s) read, all expected fields present"
+
+
+def check_usage_endpoint():
+    """Call the usage endpoint for real and confirm its shape. (ok, detail)."""
+    candidates = [n for n in profile_names() if has_credentials(profile_dir(n))]
+    if not candidates:
+        return None, "no signed-in profile to check with"
+    for name in candidates:
+        pdir = profile_dir(name)
+        exp = token_expiry(pdir)
+        if exp is not None and exp < time.time():
+            continue                       # expired, would only tell us that
+        usage, why = fetch_live(pdir)
+        if usage:
+            got = [k for k in ("5h", "7d") if usage.get(k)]
+            return True, f"{name}: responded with {', '.join(got)}"
+        if why in ("token expired", "rate limited", "unreachable"):
+            return None, f"{name}: {why} - could not check"
+        return False, f"{name}: {why} - the response no longer has the fields we read"
+    return None, "every signed-in profile has an expired token"
+
+
 def cmd_doctor(a):
     C = color()
     issues, warns = [], []
@@ -1302,6 +1368,19 @@ def cmd_doctor(a):
         else:
             ok(f"{where} -> {name}")
 
+    if a.check_upstream:
+        print(C("\nclaude code integration", "b"))
+        print(C("  checking against real data - this makes one network call", "dim"))
+        for label, fn in (("transcript format", check_transcript_format),
+                          ("usage endpoint", check_usage_endpoint)):
+            res, detail = fn()
+            if res is True:
+                ok(f"{label}: {detail}")
+            elif res is False:
+                bad(f"{label}: {detail}")
+            else:
+                warn(f"{label}: {detail}")
+
     print()
     if issues:
         print(C(f"{len(issues)} problem(s), {len(warns)} warning(s)", "rd"))
@@ -1382,6 +1461,9 @@ def main():
     p.set_defaults(fn=cmd_statusline)
 
     p = sub.add_parser("doctor", help="check the installation for problems")
+    p.add_argument("-u", "--check-upstream", action="store_true",
+                   help="also verify Claude Code's transcript format and usage "
+                        "endpoint still match what this tool expects")
     p.set_defaults(fn=cmd_doctor)
 
     p = sub.add_parser("remove", help="delete a profile and its credentials")

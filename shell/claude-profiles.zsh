@@ -166,6 +166,8 @@ _claude_prune() {
 compdef _claude_prune claude-prune
 _claude_update() { _arguments '(-c --check)'{-c,--check}'[only report, do not pull]' }
 compdef _claude_update claude-update
+_claude_doctor() { _arguments '(-u --check-upstream)'{-u,--check-upstream}'[also verify Claude Code has not changed]' }
+compdef _claude_doctor claude-doctor
 compdef _claude_sessions claude-sessions
 
 _claude_profiles() {

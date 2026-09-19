@@ -46,6 +46,45 @@ What it checks:
 Exits non-zero if it finds problems, so it works in a script. Warnings alone
 exit zero - "not logged in" is a normal state, not a fault.
 
+### Checking Claude Code has not changed
+
+```sh
+claude-doctor --check-upstream
+```
+
+Two parts of this tool read things Claude Code does not publish as an API:
+
+- `claude-sessions` and `claude-handoff` read the `.jsonl` transcript files
+- `--live` and `claude-best` call the usage endpoint
+
+Either could change in a Claude Code release. `--check-upstream` verifies both
+against your own data:
+
+```
+claude code integration
+  checking against real data - this makes one network call
+  ok   transcript format: eb82f424-….jsonl: 114 message(s) read, all expected fields present
+  ok   usage endpoint: work: responded with 5h, 7d
+```
+
+It reads your newest transcript and checks the fields are still where this tool
+looks for them, then calls the usage endpoint once with a signed-in profile and
+checks the reply still contains the two limits.
+
+| Result | Means |
+|---|---|
+| `ok` | nothing has changed |
+| `FAIL` | Claude Code changed something this tool reads - please [open an issue](https://github.com/Nandeep2750/claude-profiles/issues) |
+| `warn` | could not check - no transcripts yet, an expired token, or a rate limit |
+
+A transient problem warns rather than fails, so it does not cry wolf when the
+endpoint is simply busy.
+
+!!! note "Why this is not in CI"
+    It needs real credentials and real transcripts. Putting a Claude token into
+    a CI secret would be a bad trade for a check that only matters on a machine
+    you actually use. Run it yourself now and then - monthly is plenty.
+
 ---
 
 ---

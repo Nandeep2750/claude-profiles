@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-09-19
+
+### Added
+
+- **`claude-doctor --check-upstream`** verifies the two Claude Code internals
+  this tool depends on - the transcript format and the usage endpoint - against
+  your own data. It reads your newest transcript and confirms the fields are
+  still where `claude-sessions` looks for them, then calls the endpoint once and
+  confirms the reply still carries both limits.
+
+  A transient problem (expired token, rate limit, no transcripts yet) warns
+  rather than fails, so it does not cry wolf.
+
+  This cannot live in CI: CI has no Claude credentials and its transcripts are
+  synthetic fixtures, so it would only ever test the fixtures. The check has to
+  run where the real data is.
+
 ## [1.6.0] - 2026-09-19
 
 ### Changed
@@ -214,6 +231,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.7.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.0
 [1.6.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.6.0
 [1.5.3]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.3
 [1.5.2]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.2
