@@ -52,6 +52,34 @@ the shell functions launch the Python core fresh on every call. Changes under
 reloaded. `claude-update` tells you which kind you just got, so you only restart
 when it is actually necessary.
 
+## Reloading your shell
+
+When `claude-update` says the shell layer changed, reload any terminal you
+already had open. New terminals pick the change up on their own.
+
+=== "macOS / Linux / WSL"
+
+    ```sh
+    exec $SHELL -l
+    ```
+
+=== "Windows (PowerShell)"
+
+    ```powershell
+    Import-Module "$HOME\.claude-tools\shell\ClaudeProfiles.psm1" -Force
+    ```
+
+    Or open a new PowerShell window.
+
+=== "Or simply"
+
+    Close the terminal and open a new one. Nothing is lost - profiles,
+    credentials and conversations all live outside the shell.
+
+!!! note "Only already-open shells need this"
+    A terminal opened after the update reads the new files at startup. Reloading
+    is only for the ones that were already running.
+
 ## Safety
 
 - **`--ff-only`** - the update refuses to merge or rebase. If your checkout has

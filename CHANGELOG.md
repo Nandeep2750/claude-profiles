@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] - 2026-09-19
+
+### Fixed
+
+- **Reload advice was POSIX-only.** `claude-update` and six places in the
+  documentation told every user to run `exec $SHELL -l`, which is not a
+  PowerShell command - leaving Windows users with no valid instruction. The
+  message is now platform-aware, and the docs give the command per platform.
+- **Restarting the shell was only ever shown inside a sample output block** on
+  the Updating page, so it read as illustration rather than a step. It is now
+  its own section, with tabs for macOS/Linux/WSL and Windows, and a note that
+  only already-open terminals need it.
+
 ## [1.5.2] - 2026-09-19
 
 ### Fixed
@@ -182,6 +195,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.5.3]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.3
 [1.5.2]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.2
 [1.5.1]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.1
 [1.5.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.0

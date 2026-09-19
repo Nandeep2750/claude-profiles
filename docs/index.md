@@ -52,7 +52,7 @@ three ways:
 ```sh
 git clone https://github.com/Nandeep2750/claude-profiles.git ~/.claude-tools
 sh ~/.claude-tools/install.sh
-exec $SHELL -l
+exec $SHELL -l          # or just open a new terminal
 ```
 
 ```sh

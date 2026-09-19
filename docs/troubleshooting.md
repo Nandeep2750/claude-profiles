@@ -12,7 +12,7 @@ The shell was started before the tooling was installed, or the `source` line is
 missing from your rc file.
 
 ```sh
-exec $SHELL -l                       # reload this shell
+exec $SHELL -l                       # reload this shell (PowerShell: open a new window)
 grep claude-profiles ~/.zshrc        # or ~/.bashrc - is the source line there?
 ```
 

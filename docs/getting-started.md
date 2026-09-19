@@ -29,11 +29,21 @@
     sh ~/.claude-tools/install.sh
     ```
 
-Restart your shell afterwards:
+Then restart your shell so it picks up the new commands:
 
-```sh
-exec $SHELL -l
-```
+=== "macOS / Linux / WSL"
+
+    ```sh
+    exec $SHELL -l
+    ```
+
+=== "Windows (PowerShell)"
+
+    ```powershell
+    Import-Module "$HOME\.claude-tools\shell\ClaudeProfiles.psm1" -Force
+    ```
+
+Opening a new terminal works just as well.
 
 The installer detects zsh vs bash, backs up any rc file it edits, and is safe to
 re-run - it will not add duplicate lines.

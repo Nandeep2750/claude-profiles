@@ -26,12 +26,21 @@ import time
 import urllib.error
 import urllib.request
 
-__version__ = "1.5.2"
+__version__ = "1.5.3"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
 DEFAULT_DIR = os.path.join(HOME, ".claude")
 IS_MAC = sys.platform == "darwin"
+IS_WINDOWS = os.name == "nt"
+
+
+def reload_hint():
+    """How to reload the shell, in terms that work on this platform."""
+    if IS_WINDOWS:
+        return ('re-import the module or open a new PowerShell window:\n'
+                '    Import-Module "$HOME\\.claude-tools\\shell\\ClaudeProfiles.psm1" -Force')
+    return "run 'exec $SHELL -l' or open a new terminal"
 
 
 VALID_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -1032,7 +1041,7 @@ def cmd_update(a):
 
     _, changed, _ = _git("diff", "--name-only", before, after)
     if any(f.startswith("shell/") for f in changed.splitlines()):
-        print(C("\nthe shell layer changed - run 'exec $SHELL -l' or open a new terminal", "yl"))
+        print(C(f"\nthe shell layer changed - {reload_hint()}", "yl"))
     else:
         print(D("\nonly the core changed - no shell restart needed"))
     return 0
