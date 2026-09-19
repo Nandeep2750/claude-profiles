@@ -214,8 +214,30 @@ class TestUsage(Fixture):
     def test_buckets_on_junk_is_empty_not_an_error(self):
         self.assertEqual(self.core._buckets({}), {"5h": None, "7d": None})
 
-    def test_live_fetch_without_token_returns_none(self):
-        self.assertIsNone(self.core.fetch_live(os.path.join(self.ph, "empty")))
+    def test_live_fetch_without_token_says_so(self):
+        usage, why = self.core.fetch_live(os.path.join(self.ph, "empty"))
+        self.assertIsNone(usage)
+        self.assertEqual(why, "not logged in")
+
+    def test_live_fetch_reports_unreachable(self):
+        old = self.core.USAGE_URL
+        self.core.USAGE_URL = "https://127.0.0.1:9/nope"
+        try:
+            usage, why = self.core.fetch_live(os.path.join(self.ph, "work"), timeout=2)
+        finally:
+            self.core.USAGE_URL = old
+        self.assertIsNone(usage)
+        self.assertEqual(why, "unreachable")
+
+    def test_token_expiry_is_read(self):
+        w = os.path.join(self.ph, "work")
+        with open(os.path.join(w, ".credentials.json"), "w") as fh:
+            json.dump({"claudeAiOauth": {"accessToken": "fake",
+                                         "expiresAt": 1700000000000}}, fh)
+        self.assertEqual(self.core.token_expiry(w), 1700000000.0)
+
+    def test_token_expiry_absent_is_none(self):
+        self.assertIsNone(self.core.token_expiry(os.path.join(self.ph, "empty")))
 
     def test_until_and_ago_formatting(self):
         import datetime

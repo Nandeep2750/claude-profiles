@@ -4,6 +4,28 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-09-19
+
+### Changed
+
+- **`--live` now says why it fell back.** A failed fetch previously showed only
+  `(cached)`, which made an expired token look like the feature was broken. The
+  `AS OF` column now distinguishes `token expired`, `rate limited`,
+  `unreachable`, `not logged in` and `http NNN`, with a hint below the table.
+- `claude-doctor` warns when a profile's access token has expired.
+
+### Added
+
+- `token_expiry()` reads a profile's token expiry from either credential
+  backend.
+
+### Note
+
+Access tokens are short-lived and Claude Code refreshes them when it runs. This
+tool deliberately does not refresh them: refresh tokens can rotate, and writing
+one back risks desynchronising Claude Code's own credential state. Running any
+session under a profile refreshes its token.
+
 ## [1.2.1] - 2026-09-18
 
 ### Security
@@ -93,6 +115,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.3.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.3.0
 [1.2.1]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.2.1
 [1.2.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.1.0

@@ -99,9 +99,38 @@ Fetches each signed-in profile's current usage directly, in parallel, and shows
 `live` in the `AS OF` column. This costs **no model tokens** - it reads a usage
 endpoint, it does not run a prompt.
 
-Any profile whose fetch fails silently falls back to its cached snapshot, marked
-`(cached)`, so the table always renders. A note below the table says whether any
-profile fell back.
+Any profile whose fetch fails falls back to its cached snapshot **and says
+why** in the `AS OF` column, so the table always renders:
+
+| Shown | Meaning |
+|---|---|
+| `live` | fetched just now |
+| `14h ago (token expired)` | the access token has aged out - see below |
+| `14h ago (rate limited)` | the usage endpoint returned 429; try again shortly |
+| `14h ago (unreachable)` | no network, or the request timed out |
+| `14h ago (not logged in)` | no credentials for that profile |
+
+### Expired tokens
+
+Access tokens are short-lived - roughly half a day - and Claude Code refreshes
+them whenever it runs. A profile you have not used since its token aged out
+returns 401, so `--live` reports `token expired` and falls back.
+
+Open a session under that profile and the token refreshes:
+
+```sh
+claude-profile work
+claude       # any session refreshes it
+```
+
+!!! note "Why this tool does not refresh tokens itself"
+    It could, using the stored refresh token - but refresh tokens can rotate,
+    and writing a new one back risks desynchronising Claude Code's own copy.
+    Reporting the problem is safer than silently competing with Claude Code
+    over credential state.
+
+`claude-doctor` also warns about expired tokens, so you can spot them before
+they surprise you.
 
 !!! note "What this sends, and where"
     `--live` reads that profile's OAuth token from your Keychain (macOS) or its

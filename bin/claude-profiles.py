@@ -26,7 +26,7 @@ import time
 import urllib.error
 import urllib.request
 
-__version__ = "1.2.1"
+__version__ = "1.3.0"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -154,8 +154,8 @@ RELEASES_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
 TOOLS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def access_token(pdir):
-    """This profile's OAuth access token, from whichever backend holds it."""
+def _credentials_blob(pdir):
+    """The stored credential JSON for a profile, or None."""
     blob = None
     f = os.path.join(pdir, ".credentials.json")
     if os.path.isfile(f):
@@ -174,9 +174,13 @@ def access_token(pdir):
                 blob = json.loads(r.stdout.strip())
         except Exception:
             return None
-    if not isinstance(blob, dict):
-        return None
-    return (blob.get("claudeAiOauth") or {}).get("accessToken")
+    return blob if isinstance(blob, dict) else None
+
+
+def access_token(pdir):
+    """This profile's OAuth access token, from whichever backend holds it."""
+    blob = _credentials_blob(pdir)
+    return ((blob or {}).get("claudeAiOauth") or {}).get("accessToken")
 
 
 def _buckets(obj):
@@ -204,11 +208,24 @@ def _buckets(obj):
     return out
 
 
+def token_expiry(pdir):
+    """When this profile's access token expires, as a unix time, or None."""
+    blob = _credentials_blob(pdir)
+    ms = ((blob or {}).get("claudeAiOauth") or {}).get("expiresAt")
+    return ms / 1000 if isinstance(ms, (int, float)) else None
+
+
 def fetch_live(pdir, timeout=6):
-    """Live usage straight from the API, or None. Never raises."""
+    """(usage, reason) from the API. usage is None on failure; reason says why.
+
+    Access tokens are short-lived and Claude Code refreshes them when it runs.
+    This tool deliberately does not refresh them: the refresh token may rotate,
+    and writing a new one back could desynchronise Claude Code's own copy. An
+    expired token is reported instead, so the fix is obvious.
+    """
     token = access_token(pdir)
     if not token:
-        return None
+        return None, "not logged in"
     assert USAGE_URL.startswith("https://")   # noqa: S101 - guards urlopen below
     req = urllib.request.Request(USAGE_URL, headers={
         "Authorization": f"Bearer {token}",
@@ -218,14 +235,22 @@ def fetch_live(pdir, timeout=6):
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             payload = json.loads(r.read().decode())
-    except Exception:
-        return None
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            return None, "token expired"
+        if e.code == 429:
+            return None, "rate limited"
+        return None, f"http {e.code}"
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return None, "unreachable"
+    except (ValueError, json.JSONDecodeError):
+        return None, "bad response"
     b = _buckets(payload if isinstance(payload, dict) else {})
     if not any(b.get(k) for k in ("5h", "7d")):
-        return None
+        return None, "no usage in response"
     b["age"] = 0.0
     b["live"] = True
-    return b
+    return b, ""
 
 
 def until(iso):
@@ -428,7 +453,7 @@ def cmd_status(a):
             with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
                 futs = {ex.submit(fetch_live, profile_dir(n)): n for n in targets}
                 for f in concurrent.futures.as_completed(futs):
-                    live[futs[f]] = f.result()
+                    live[futs[f]] = f.result()          # (usage, reason)
 
     rows = []
     for n in names:
@@ -441,7 +466,8 @@ def cmd_status(a):
         if a.dirs:
             row.insert(1, d.replace(HOME, "~"))
         if not a.no_usage:
-            u = live.get(n) or usage_of(d)
+            fresh, why = live.get(n, (None, ""))
+            u = fresh or usage_of(d)
             if not u:
                 row += [D("-"), D("-"), D("-"), D("-"), D("never used")]
             else:
@@ -450,7 +476,7 @@ def cmd_status(a):
                 if u.get("live"):
                     when = C("live", "gr")
                 elif a.live:
-                    when = C(f"{ago(u['age'])} (cached)", "yl")
+                    when = C(f"{ago(u['age'])} ({why or 'cached'})", "yl")
                 else:
                     when = C(ago(u["age"]), "yl" if u["age"] > 86400 else "dim")
                 row += [p5, r5, p7, r7, when]
@@ -459,10 +485,18 @@ def cmd_status(a):
     print(render_table(headers, rows, aligns, plain=a.plain, dim=D))
     if not a.no_usage:
         if a.live:
-            if any(v for v in live.values()):
+            if any(v[0] for v in live.values()):
                 print(D("live figures fetched from the Anthropic usage API"))
-            if any(v is None for v in live.values()):
-                print(D("some profiles fell back to their cached snapshot"))
+            stale = sorted(n for n, (v, _) in live.items() if v is None)
+            if stale:
+                reasons = {live[n][1] for n in stale}
+                print(C(f"cached instead for: {', '.join(stale)}"
+                        f"  ({', '.join(sorted(reasons))})", "yl"))
+                if "token expired" in reasons:
+                    print(D("a token refreshes when that profile runs claude - "
+                            "open a session there, or use the cached figures"))
+                if "rate limited" in reasons:
+                    print(D("the usage endpoint is rate limited - try again shortly"))
         else:
             print(D("cached snapshot - refreshes at most every 5 min while a profile runs."
                     " use --live for current figures"))
@@ -835,7 +869,7 @@ def cmd_best(a):
         d = profile_dir(n)
         if not has_credentials(d):
             continue
-        u = (fetch_live(d) if not a.cached else None) or usage_of(d)
+        u = (None if a.cached else fetch_live(d)[0]) or usage_of(d)
         if not u:
             continue
         pcts = [b["pct"] for b in (u.get("5h"), u.get("7d"))
@@ -1013,6 +1047,10 @@ def cmd_doctor(a):
             ok(f"{n}: {account_email(d) or 'signed in'}")
         else:
             warn(f"{n}: not logged in - run 'claude-profile {n}' then /login")
+        exp = token_expiry(d)
+        if exp is not None and exp < time.time():
+            warn(f"{n}: access token expired {ago(time.time() - exp)} - "
+                 "--live will fall back to cached figures until you run claude there")
         cred = os.path.join(d, ".credentials.json")
         if os.path.isfile(cred):
             mode = os.stat(cred).st_mode & 0o777
