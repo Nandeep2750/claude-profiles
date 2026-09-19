@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-09-19
+
+### Fixed
+
+- **`--live` now remembers what it fetched.** It displayed fresh figures and
+  discarded them, so the next plain `claude-profiles` fell back to a snapshot
+  that could be many hours old. Results are written beside the profile, and
+  whichever cache is newer is used. Claude Code's own `.claude.json` is still
+  never written to - that file is its to manage.
+
 ## [1.5.0] - 2026-09-19
 
 ### Added
@@ -143,6 +153,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.5.1]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.1
 [1.5.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.0
 [1.4.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.3.0

@@ -26,7 +26,7 @@ import time
 import urllib.error
 import urllib.request
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -123,12 +123,62 @@ def account_email(pdir):
         return None
 
 
-def usage_of(pdir):
-    """Cached usage utilisation for a profile, or None.
+OWN_CACHE = ".usage-cache.json"
 
-    Claude Code refreshes this only when that profile actually runs, so it is a
-    snapshot, never live. Always show its age alongside.
+
+def _own_cache_path(pdir):
+    return os.path.join(pdir, OWN_CACHE)
+
+
+def save_usage(pdir, buckets):
+    """Persist a live fetch beside the profile, so plain runs see it too.
+
+    Written to our own file rather than Claude Code's .claude.json: that file
+    is Claude Code's to manage, and writing it while a session is running risks
+    clobbering its state.
     """
+    try:
+        os.makedirs(pdir, exist_ok=True)
+        payload = {"fetchedAtMs": int(time.time() * 1000),
+                   "utilization": {k: buckets.get(k) for k in ("5h", "7d")}}
+        tmp = _own_cache_path(pdir) + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(payload, fh)
+        os.replace(tmp, _own_cache_path(pdir))
+    except OSError:
+        pass
+
+
+def _own_cache(pdir):
+    try:
+        with open(_own_cache_path(pdir)) as fh:
+            d = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    u = d.get("utilization")
+    if not isinstance(u, dict):
+        return None
+    out = {"age": max(0.0, time.time() - d.get("fetchedAtMs", 0) / 1000)}
+    for k in ("5h", "7d"):
+        out[k] = u.get(k) if isinstance(u.get(k), dict) else None
+    return out if any(out.get(k) for k in ("5h", "7d")) else None
+
+
+def usage_of(pdir):
+    """Newest cached usage for a profile, or None.
+
+    Two caches exist: Claude Code's own, refreshed only while that profile
+    runs, and ours, written by --live. Whichever is newer wins.
+    """
+    mine = _own_cache(pdir)
+    theirs = _claude_code_cache(pdir)
+    if mine and theirs:
+        return mine if mine["age"] <= theirs["age"] else theirs
+    return mine or theirs
+
+
+def _claude_code_cache(pdir):
+    """Claude Code's own cachedUsageUtilization, or None."""
     try:
         with open(global_config(pdir)) as fh:
             u = json.load(fh).get("cachedUsageUtilization")
@@ -250,6 +300,7 @@ def fetch_live(pdir, timeout=6):
         return None, "no usage in response"
     b["age"] = 0.0
     b["live"] = True
+    save_usage(pdir, b)
     return b, ""
 
 

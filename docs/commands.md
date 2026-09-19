@@ -170,14 +170,20 @@ they surprise you.
     API. It may change or disappear in any release, which is why the cache
     remains the default and `--live` degrades to it rather than failing.
 
+!!! tip "A live fetch is remembered"
+    `--live` writes what it fetched beside the profile, so a plain
+    `claude-profiles` straight afterwards shows those figures as
+    `0m ago` rather than falling back to a much older snapshot.
+
 ### Why the cache is stale
 
 
 
 !!! warning "Read the AS OF column"
-    Without `--live`, figures come from a cache Claude Code writes only when
-    **that profile runs**, and it refuses to refetch more than once every five
-    minutes. A profile you have not used today shows figures from whenever you
+    Without `--live`, figures come from whichever cache is newer: Claude
+    Code's, which it writes only when **that profile runs** and refuses to
+    refresh more than once every five minutes, or the one `--live` last
+    wrote. A profile you have not used today shows figures from whenever you
     last used it; one that has never run shows `never used`.
 
 The `AS OF` value turns amber once the snapshot is more than a day old.

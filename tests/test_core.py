@@ -200,6 +200,37 @@ class TestUsage(Fixture):
         self.assertEqual(u["7d"]["pct"], 40)
         self.assertGreater(u["age"], 0)
 
+    def test_live_results_are_persisted_and_win_over_a_stale_cache(self):
+        d = os.path.join(self.home, ".claude")          # has a 1h-old CC cache
+        stale = self.core.usage_of(d)
+        self.assertGreater(stale["age"], 1800)
+        self.core.save_usage(d, {"5h": {"pct": 7, "resets": None, "locked": None},
+                                 "7d": {"pct": 8, "resets": None, "locked": None}})
+        fresh = self.core.usage_of(d)
+        self.assertEqual(fresh["5h"]["pct"], 7)
+        self.assertLess(fresh["age"], 5, "the newer cache should win")
+
+    def test_a_stale_own_cache_loses_to_a_fresh_claude_code_one(self):
+        d = os.path.join(self.home, ".claude")
+        import json as _json
+        with open(os.path.join(d, ".usage-cache.json"), "w") as fh:
+            _json.dump({"fetchedAtMs": int((time.time() - 86400) * 1000),
+                        "utilization": {"5h": {"pct": 99}, "7d": {"pct": 99}}}, fh)
+        # Claude Code's cache in the fixture is 1h old, so it should win
+        self.assertEqual(self.core.usage_of(d)["5h"]["pct"], 59)
+
+    def test_save_usage_is_atomic_and_leaves_no_temp_file(self):
+        d = os.path.join(self.ph, "work")
+        self.core.save_usage(d, {"5h": {"pct": 1}, "7d": {"pct": 2}})
+        self.assertTrue(os.path.isfile(os.path.join(d, ".usage-cache.json")))
+        self.assertFalse(os.path.exists(os.path.join(d, ".usage-cache.json.tmp")))
+
+    def test_corrupt_own_cache_is_ignored(self):
+        d = os.path.join(self.home, ".claude")
+        with open(os.path.join(d, ".usage-cache.json"), "w") as fh:
+            fh.write("{not json")
+        self.assertEqual(self.core.usage_of(d)["5h"]["pct"], 59)   # falls back
+
     def test_absent_usage_is_none(self):
         self.assertIsNone(self.core.usage_of(os.path.join(self.ph, "empty")))
 
