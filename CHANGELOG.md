@@ -19,6 +19,9 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tab; Updating sits with How it works.
 - A plain-English pass across every page: hard words replaced, long sentences
   split, and the jargon that had crept in removed.
+- Links published before this restructure still work: `/commands/`,
+  `/how-it-works/`, `/isolation/` and `/updating/` redirect to their new
+  homes, so earlier release notes and any bookmarks do not break.
 
 ## [1.5.3] - 2026-09-19
 

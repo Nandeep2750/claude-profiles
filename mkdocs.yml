@@ -92,6 +92,13 @@ markdown_extensions:
 
 plugins:
   - search
+  # keep links published before the 1.6.0 restructure working
+  - redirects:
+      redirect_maps:
+        commands.md: commands/index.md
+        how-it-works.md: internals/index.md
+        isolation.md: internals/shared.md
+        updating.md: internals/updating.md
 
 extra:
   social:
