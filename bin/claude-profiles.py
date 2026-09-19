@@ -26,7 +26,7 @@ import time
 import urllib.error
 import urllib.request
 
-__version__ = "1.5.1"
+__version__ = "1.5.2"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -1206,7 +1206,14 @@ def cmd_doctor(a):
     if cd and not os.path.isdir(cd):
         bad(f"CLAUDE_CONFIG_DIR points at a missing directory: {cd}")
     elif cd:
-        ok(f"CLAUDE_CONFIG_DIR -> {cd.replace(HOME, '~')}")
+        norm = os.path.realpath(cd)
+        inside = norm.startswith(os.path.realpath(PROF_HOME) + os.sep)
+        is_default = norm == os.path.realpath(DEFAULT_DIR)
+        if inside or is_default:
+            ok(f"CLAUDE_CONFIG_DIR -> {cd.replace(HOME, '~')}")
+        else:
+            warn(f"CLAUDE_CONFIG_DIR points outside {PROF_HOME.replace(HOME, '~')} "
+                 f"({cd.replace(HOME, '~')}) - this tool will not see it as a profile")
     else:
         ok("CLAUDE_CONFIG_DIR unset (profile 'default')")
     dflt = os.environ.get("CLAUDE_DEFAULT_PROFILE")

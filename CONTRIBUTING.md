@@ -14,10 +14,17 @@ sh install.sh          # wires your shell to this checkout
 ## Running the tests
 
 ```sh
-python3 -m unittest discover -s tests -v   # core
-bash tests/test_shell.sh                   # shell layer, bash
-zsh  tests/test_shell.sh                   # shell layer, zsh
+python3 -m unittest discover -s tests -v   # core logic
+bash tests/test_shell.sh                   # shell wiring, bash
+zsh  tests/test_shell.sh                   # shell wiring, zsh
+bash tests/test_e2e.sh                     # every command, run for real
+zsh  tests/test_e2e.sh
 ```
+
+Three layers, deliberately: the unit tests exercise the core directly, the
+shell tests check the wiring, and the end-to-end tests run every user-facing
+command through the shell wrappers and assert on what it prints. A command can
+pass the first two and still be unreachable - that has happened.
 
 Every test runs against a throwaway `HOME`, so your real profiles, credentials
 and conversations are never touched. If a test ever needs the real ones,

@@ -117,11 +117,16 @@ claude-profile work >/dev/null
 is "ordinary names still work" "work" "${CLAUDE_PROFILE_NAME:-}"
 claude-profile default >/dev/null
 
-# new subcommands dispatch through claude-profiles
-for sub in prune best clone update; do
-  claude-profiles "$sub" --help >/dev/null 2>&1 \
-    && ok "claude-profiles $sub dispatches" \
-    || bad "claude-profiles $sub dispatches" "exit 0" "non-zero"
+# every subcommand the core offers must dispatch through claude-profiles.
+# The wrapper matches a hardcoded list, so this catches it drifting behind.
+# iterate the substitution directly: zsh does not word-split a plain variable
+for sub in $("${CLAUDE_PY:-python3}" "$REPO/bin/claude-profiles.py" --help 2>&1 \
+             | grep -oE '\{[a-z,]+\}' | head -1 | tr -d '{}' | tr ',' ' '); do
+  if claude-profiles "$sub" --help >/dev/null 2>&1; then
+    ok "claude-profiles $sub dispatches"
+  else
+    bad "claude-profiles $sub dispatches" "exit 0" "fell through to status"
+  fi
 done
 
 # the core is reachable through the wrappers

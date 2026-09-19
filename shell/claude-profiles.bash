@@ -35,10 +35,11 @@ claude-profile() {
              [ -d "$CLAUDE_CONFIG_DIR" ] || mkdir -p "$CLAUDE_CONFIG_DIR" ;;
   esac
 }
-# `claude-profiles` with no subcommand means `status`; anything else passes through.
+# `claude-profiles` with no subcommand means `status`; a known subcommand passes
+# through. Keep this list in step with the core - tests/test_shell.sh checks it.
 claude-profiles() {
   case "$1" in
-    status|sessions|handoff|remove|doctor|path|clone|prune|best|update) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
+    clone|best|doctor|handoff|path|prune|remove|sessions|status|statusline|update) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
     *)                                          "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@" ;;
   esac
 }

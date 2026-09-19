@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-09-19
+
+### Fixed
+
+- **`claude-profiles statusline` was unreachable through the shell wrapper.**
+  The wrapper matches a hardcoded list of subcommands and `statusline` was
+  never added, so it fell through to `status` and failed with "unrecognized
+  arguments". The shell tests now derive that list from the core, so a new
+  subcommand cannot silently go missing again.
+
+- `claude-doctor` now warns when `CLAUDE_CONFIG_DIR` points outside
+  `CLAUDE_PROFILE_HOME`, where this tool cannot see it as a profile and its
+  messages become confusing.
+
+### Added
+
+- **`tests/test_e2e.sh`** - every user-facing command run for real through the
+  shell wrappers, asserting on what it prints, with all destructive operations
+  confined to a throwaway `HOME`. 59 checks per shell, in CI for bash and zsh.
+  The `statusline` bug passed both existing test layers, which only proved the
+  core worked and the layer loaded.
+
+### Changed
+
+- Documentation: the Settings page now explains how a profile is chosen -
+  nearest `.claude-profile` marker, then `CLAUDE_DEFAULT_PROFILE`, then
+  `default` - and how to mark a project. Previously the fallback was described
+  without ever mentioning the markers it falls back from.
+
 ## [1.5.1] - 2026-09-19
 
 ### Fixed
@@ -153,6 +182,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.5.2]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.2
 [1.5.1]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.1
 [1.5.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.0
 [1.4.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.4.0

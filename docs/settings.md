@@ -3,19 +3,91 @@
 Everything is configured through environment variables, set in your rc file
 **before** the `source` line that loads the shell layer.
 
+## How a profile gets chosen
+
+Before the variables, the rule they fit into. On every `cd` - and before the
+first prompt of a new terminal - the shell layer walks **up** from the current
+directory looking for a `.claude-profile` file:
+
+```
+~/projects/<project-name>/api/src    no marker, go up
+~/projects/<project-name>/api        no marker, go up
+~/projects/<project-name>            .claude-profile -> "work"   <- first match wins
+```
+
+1. The nearest `.claude-profile` walking upward, if there is one.
+2. Otherwise `CLAUDE_DEFAULT_PROFILE`, if you set it.
+3. Otherwise `default`, the original `~/.claude`.
+
+So markers answer *"in this project, use that account"*, and
+`CLAUDE_DEFAULT_PROFILE` answers *"and everywhere else, use this one"*.
+
+### Marking a project
+
+Create the file in any directory - a single repo, or a folder containing
+several:
+
+```sh
+echo work > ~/projects/<project-name>/.claude-profile
+```
+
+It contains nothing but a profile name. From then on, `cd` anywhere at or below
+that directory selects `work` automatically, and `claude` uses that account
+without you switching anything.
+
+```
+~/projects/<project-name>/          .claude-profile -> "work"
+  ├── api/                       -> work
+  ├── web/                       -> work
+  └── infra/                     -> work
+```
+
+Putting it one level **above** your repos, as here, covers all of them from one
+file and keeps it outside version control - nothing to commit or gitignore. Put
+it inside a repo instead if only that repo should differ.
+
+A deeper marker beats a shallower one, so a single repo can opt out of its
+parent's rule:
+
+```sh
+echo personal > ~/projects/<project-name>/experiment/.claude-profile
+```
+
+Markers are just files: delete one to remove the rule, `cat` one to see it, and
+`claude-doctor` reports any that name a profile which does not exist.
+
+See [Per-project accounts](guides/per-project.md) for the full guide.
+
 ## `CLAUDE_DEFAULT_PROFILE`
 
-Which profile a directory with no `.claude-profile` marker falls back to.
-Defaults to `default`, i.e. the original `~/.claude`.
+Which profile an **unmarked** directory falls back to. Defaults to `default`,
+i.e. the original `~/.claude`.
 
 ```sh
 export CLAUDE_DEFAULT_PROFILE=work
 source "$HOME/.claude-tools/shell/claude-profiles.zsh"
 ```
 
-Useful when your original `~/.claude` is not the account you actually want as a
-fallback - after logging out of it, for instance. A `.claude-profile` marker
-always wins over this.
+Set it before the `source` line, in `~/.zshrc` or `~/.bashrc`.
+
+This is the machine-wide fallback, not a per-project setting - it applies
+wherever no marker matches. It earns its keep when `default` is not the account
+you want to land on: after logging out of it, or if your original `~/.claude`
+belongs to an account you rarely use.
+
+!!! tip "A marker always wins"
+    Setting this does not disturb directories that already have a
+    `.claude-profile`. It only changes what happens everywhere else.
+
+If you would rather not set an environment variable, a marker at your home
+directory does much the same job:
+
+```sh
+echo work > ~/.claude-profile
+```
+
+The difference: the variable applies wherever your rc file is loaded, while a
+marker at `~` is a real file that anything walking upward will also find.
 
 ## `CLAUDE_PROFILE_PROMPT`
 
