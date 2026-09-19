@@ -13,6 +13,8 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   git branch, context window, rate limits and session cost, configurable with
   `--show`. Rate limits and context come from the payload Claude Code passes
   in, so they are current without an extra network call.
+- `statusline --install` / `--install-all` write the setting into a profile's
+  `settings.json`, so enabling it does not mean hand-editing JSON.
 
 ## [1.3.0] - 2026-09-19
 

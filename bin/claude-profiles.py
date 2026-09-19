@@ -999,6 +999,35 @@ def _tone(pct, text):
     return f"\033[{c}m{text}\033[0m"
 
 
+def install_statusline(profile, show, force=False):
+    """Write the statusLine setting into a profile's settings.json."""
+    pdir = profile_dir(profile)
+    if not os.path.isdir(pdir):
+        return f"no such profile: {profile}"
+    f = os.path.join(pdir, "settings.json")
+    try:
+        with open(f) as fh:
+            cfg = json.load(fh)
+    except FileNotFoundError:
+        cfg = {}
+    except ValueError:
+        return f"{f} is not valid JSON - fix or move it first"
+    existing = cfg.get("statusLine")
+    if existing and not force:
+        cur = (existing or {}).get("command", "")
+        if "claude-profiles" not in cur:
+            return f"{profile}: already has a different statusLine (pass --force)"
+    cmd = (f'python3 "{os.path.join(TOOLS_DIR, "bin", "claude-profiles.py")}"'
+           f" statusline --show {show}").replace(HOME, "$HOME")
+    cfg["statusLine"] = {"type": "command", "command": cmd, "padding": 0}
+    os.makedirs(pdir, exist_ok=True)
+    if os.path.exists(f):
+        shutil.copy2(f, f + ".bak")
+    with open(f, "w") as fh:
+        json.dump(cfg, fh, indent=2)
+    return None
+
+
 def cmd_statusline(a):
     """One line for Claude Code's statusLine setting.
 
@@ -1006,6 +1035,16 @@ def cmd_statusline(a):
     cost, model - and renders whatever we print. The active profile comes from
     CLAUDE_CONFIG_DIR, which the child process inherits.
     """
+    if a.install or a.install_all:
+        C = color()
+        targets = profile_names() if a.install_all else [active_profile()]
+        for p in targets:
+            err = install_statusline(p, a.show, a.force)
+            print(f"  {C('skip', 'yl')} {err}" if err
+                  else f"  {C('ok  ', 'gr')} {p}: status line enabled")
+        print("\nstart a new Claude Code session to see it")
+        return 0
+
     try:
         blob = json.load(sys.stdin) if not sys.stdin.isatty() else {}
     except Exception:
@@ -1264,9 +1303,15 @@ def main():
 
     p = sub.add_parser("statusline", help="one-line status for Claude Code's statusLine")
     p.add_argument("--show", default="profile,account,limits",
-                   help="comma-separated segments, in order of preference: "
-                        "profile, account, model, dir, branch, context, limits, "
-                        "cost, lines, version, session")
+                   help="comma-separated segments, in order: profile, account, "
+                        "model, dir, branch, context, limits, cost, lines, "
+                        "version, session")
+    p.add_argument("--install", action="store_true",
+                   help="enable it for the active profile")
+    p.add_argument("--install-all", action="store_true",
+                   help="enable it for every profile")
+    p.add_argument("--force", action="store_true",
+                   help="replace an existing statusLine")
     p.set_defaults(fn=cmd_statusline)
 
     p = sub.add_parser("doctor", help="check the installation for problems")

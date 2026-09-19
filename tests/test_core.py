@@ -481,6 +481,74 @@ class TestBestRobustness(Fixture):
         self.assertEqual(self.core.until(None), "-")
 
 
+class TestStatusline(Fixture):
+    def payload(self):
+        return json.dumps({
+            "model": {"display_name": "Opus 5"},
+            "workspace": {"current_dir": "/home/u/p"},
+            "context_window": {"used_percentage": 52, "context_window_size": 1000000},
+            "rate_limits": {"five_hour": {"used_percentage": 2},
+                            "seven_day": {"used_percentage": 3}},
+            "cost": {"total_cost_usd": 1.23},
+        })
+
+    def render(self, show):
+        import io as _io
+        out = _io.StringIO()
+        old_in, old_argv = sys.stdin, sys.argv
+        sys.stdin = _io.StringIO(self.payload())
+        sys.argv = ["claude-profiles", "statusline", "--show", show]
+        try:
+            with redirect_stdout(out):
+                self.core.main()
+        finally:
+            sys.stdin, sys.argv = old_in, old_argv
+        return out.getvalue()
+
+    def test_shows_the_profile(self):
+        self.assertIn("default", self.render("profile"))
+
+    def test_limits_come_from_the_payload(self):
+        r = self.render("limits")
+        self.assertIn("5h 2%", r)
+        self.assertIn("7d 3%", r)
+
+    def test_context_and_cost(self):
+        r = self.render("context,cost")
+        self.assertIn("ctx 52%", r)
+        self.assertIn("$1.23", r)
+
+    def test_unknown_segment_is_ignored(self):
+        self.assertNotIn("nonsense", self.render("profile,nonsense"))
+
+    def test_install_writes_the_setting(self):
+        err = self.core.install_statusline("work", "profile,limits")
+        self.assertIsNone(err)
+        with open(os.path.join(self.ph, "work", "settings.json")) as fh:
+            cfg = json.load(fh)
+        self.assertIn("statusline", cfg["statusLine"]["command"])
+
+    def test_install_refuses_an_unknown_profile(self):
+        self.assertIn("no such profile", self.core.install_statusline("nope", "profile"))
+
+    def test_install_leaves_a_foreign_statusline_alone(self):
+        f = os.path.join(self.ph, "work", "settings.json")
+        with open(f, "w") as fh:
+            json.dump({"statusLine": {"type": "command", "command": "my-own-thing"}}, fh)
+        err = self.core.install_statusline("work", "profile")
+        self.assertIn("already has a different statusLine", err)
+        with open(f) as fh:
+            self.assertEqual(json.load(fh)["statusLine"]["command"], "my-own-thing")
+
+    def test_force_replaces_it(self):
+        f = os.path.join(self.ph, "work", "settings.json")
+        with open(f, "w") as fh:
+            json.dump({"statusLine": {"type": "command", "command": "my-own-thing"}}, fh)
+        self.assertIsNone(self.core.install_statusline("work", "profile", force=True))
+        with open(f) as fh:
+            self.assertIn("statusline", json.load(fh)["statusLine"]["command"])
+
+
 class TestHandoff(Fixture):
     def setUp(self):
         super().setUp()

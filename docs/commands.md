@@ -516,19 +516,34 @@ setting instead.
 work │ you@company.com │ ⎇ main │ ctx 52%/1000k │ 5h 2% │ 7d 3% │ $12.40
 ```
 
-Enable it in the profile's `settings.json`:
+### Enabling it
+
+```sh
+claude-profiles statusline --install                  # the active profile
+claude-profiles statusline --install-all              # every profile
+claude-profiles statusline --install-all --show profile,limits   # pick the segments
+```
+
+That writes the setting into each profile's `settings.json`, backing up any
+existing file alongside. Settings are per-profile, which is why `--install-all`
+exists. An existing status line from somewhere else is left alone unless you
+pass `--force`.
+
+Start a new Claude Code session to see it - the setting is read at launch.
+
+<details>
+<summary>Or configure it by hand</summary>
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "python3 \"$HOME/.claude-tools/bin/claude-profiles.py\" statusline --show profile,account,branch,context,limits,cost",
+    "command": "python3 \"$HOME/.claude-tools/bin/claude-profiles.py\" statusline --show profile,account,limits",
     "padding": 0
   }
 }
 ```
-
-Settings are per-profile, so add it to each profile you want it on.
+</details>
 
 ### Segments
 
@@ -543,13 +558,19 @@ Settings are per-profile, so add it to each profile you want it on.
 | `branch` | the git branch |
 | `context` | context window used, colour-coded |
 | `limits` | 5-hour and 7-day usage, each its own segment |
-| `cost` | session cost so far |
+| `cost` | what this session's tokens would cost at API rates |
 | `lines` | lines added and removed this session |
 | `version` | the Claude Code version |
 | `session` | the session name |
 
 Percentages are green below 75%, amber from 75%, red from 90% - the same scale
 `claude-profiles` uses.
+
+!!! note "`cost` is not a bill"
+    It is `total_cost_usd` from the payload: what this session's tokens would
+    cost at pay-as-you-go API rates. On a subscription you are not charged it -
+    treat it as a sense of how heavy the session is. Leave the segment out if
+    that number is more distracting than useful.
 
 !!! note "These figures come from Claude Code, not the cache"
     Claude Code passes current rate limits and context usage to the status line
