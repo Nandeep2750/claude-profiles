@@ -105,8 +105,11 @@ add-zsh-hook precmd _claude_profile_auto
 # file to append the active profile to RPROMPT. claude_profile_prompt is also
 # usable on its own if you build your prompt by hand.
 claude_profile_prompt() {
-  local n="${CLAUDE_PROFILE_NAME:-${CLAUDE_DEFAULT_PROFILE:-default}}"
-  [[ "$n" == "default" && -z "${CLAUDE_PROFILE_SHOW_DEFAULT:-}" ]] && return
+  local quiet="${CLAUDE_DEFAULT_PROFILE:-default}"
+  local n="${CLAUDE_PROFILE_NAME:-$quiet}"
+  # silent on whichever profile is your normal one, so the prompt only speaks up
+  # when you are somewhere unusual
+  [[ "$n" == "$quiet" && -z "${CLAUDE_PROFILE_SHOW_DEFAULT:-}" ]] && return
   print -rn -- "${CLAUDE_PROFILE_PROMPT_PREFIX:-claude:}$n"
 }
 if [[ -n "${CLAUDE_PROFILE_PROMPT:-}" ]]; then

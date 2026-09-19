@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-09-19
+
+### Fixed
+
+- **The prompt indicator now stays quiet on your configured default**, not just
+  on `default`. Anyone using `CLAUDE_DEFAULT_PROFILE` saw the indicator on every
+  prompt, which defeats its purpose: it is meant to speak up only when you are
+  somewhere unusual.
+
 ## [1.7.0] - 2026-09-19
 
 ### Added
@@ -231,6 +240,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.7.1]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.1
 [1.7.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.0
 [1.6.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.6.0
 [1.5.3]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.3

@@ -130,6 +130,9 @@ expect "CLAUDE_DEFAULT_PROFILE is used"   'export CLAUDE_DEFAULT_PROFILE=gamma; 
 echo "-- prompt --"
 expect "names a non-default profile"      'claude-profile gamma; claude_profile_prompt'     "gamma"
 expect "stays quiet on default"           'claude-profile default; echo "[$(claude_profile_prompt)]"' "[]"
+expect "quiet on a configured default"    'export CLAUDE_DEFAULT_PROFILE=gamma; claude-profile gamma; echo "[$(claude_profile_prompt)]"' "[]"
+expect "speaks up away from it"           'export CLAUDE_DEFAULT_PROFILE=gamma; claude-profile alpha; claude_profile_prompt' "alpha"
+expect "SHOW_DEFAULT overrides the silence" 'export CLAUDE_DEFAULT_PROFILE=gamma CLAUDE_PROFILE_SHOW_DEFAULT=1; claude-profile gamma; claude_profile_prompt' "gamma"
 
 cd / || exit 1
 rm -rf "$SANDBOX"

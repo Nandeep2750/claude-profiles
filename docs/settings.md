@@ -101,14 +101,22 @@ export CLAUDE_PROFILE_PROMPT=1
 source "$HOME/.claude-tools/shell/claude-profiles.zsh"
 ```
 
-zsh appends it to `RPROMPT`; bash prepends it to `PS1`. It stays quiet on
-`default` so your prompt is only marked when you are somewhere unusual.
+zsh appends it to `RPROMPT`; bash prepends it to `PS1`.
+
+It stays quiet on whichever profile is your normal one - `default`, or whatever
+`CLAUDE_DEFAULT_PROFILE` is set to. So the prompt only speaks up when you are
+somewhere unusual, which is when it matters:
+
+```
+~/projects/personal %                            (nothing - your usual account)
+~/projects/client-work %         claude:client   (flagged)
+```
 
 | Variable | Effect |
 |---|---|
 | `CLAUDE_PROFILE_PROMPT=1` | turn the indicator on |
 | `CLAUDE_PROFILE_PROMPT_PREFIX` | text before the name (default `claude:`) |
-| `CLAUDE_PROFILE_SHOW_DEFAULT=1` | also show it while on `default` |
+| `CLAUDE_PROFILE_SHOW_DEFAULT=1` | show it everywhere, including your usual profile |
 
 Building your own prompt? Call `claude_profile_prompt` directly - it prints the
 indicator or nothing, and touches no other state.

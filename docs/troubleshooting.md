@@ -157,8 +157,9 @@ If `RPROMPT` is empty or something else, a later line in your rc file - a
 prompt theme, for instance - has overwritten it. Move the `source` line after
 whatever sets your prompt.
 
-It stays silent on `default` by design. Set `CLAUDE_PROFILE_SHOW_DEFAULT=1` to
-show it everywhere.
+It stays silent on whichever profile is your normal one - `default`, or
+whatever `CLAUDE_DEFAULT_PROFILE` is set to. Set `CLAUDE_PROFILE_SHOW_DEFAULT=1`
+to show it everywhere.
 
 ## Both accounts hit their limits
 

@@ -109,8 +109,11 @@ esac
 
 # Optional prompt indicator - set CLAUDE_PROFILE_PROMPT=1 before sourcing.
 claude_profile_prompt() {
-  local n="${CLAUDE_PROFILE_NAME:-${CLAUDE_DEFAULT_PROFILE:-default}}"
-  if [ "$n" = "default" ] && [ -z "${CLAUDE_PROFILE_SHOW_DEFAULT:-}" ]; then return; fi
+  local quiet="${CLAUDE_DEFAULT_PROFILE:-default}"
+  local n="${CLAUDE_PROFILE_NAME:-$quiet}"
+  # silent on whichever profile is your normal one, so the prompt only speaks up
+  # when you are somewhere unusual
+  if [ "$n" = "$quiet" ] && [ -z "${CLAUDE_PROFILE_SHOW_DEFAULT:-}" ]; then return; fi
   printf '%s%s' "${CLAUDE_PROFILE_PROMPT_PREFIX:-claude:}" "$n"
 }
 if [ -n "${CLAUDE_PROFILE_PROMPT:-}" ]; then
