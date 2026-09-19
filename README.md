@@ -7,6 +7,7 @@
 Pick an account per project, and move a conversation between accounts
 when one hits its usage limit.
 
+[![Release](https://img.shields.io/github/v/release/Nandeep2750/claude-profiles?label=release&color=blue)](https://github.com/Nandeep2750/claude-profiles/releases/latest)
 [![CI](https://github.com/Nandeep2750/claude-profiles/actions/workflows/ci.yml/badge.svg)](https://github.com/Nandeep2750/claude-profiles/actions/workflows/ci.yml)
 [![Docs](https://github.com/Nandeep2750/claude-profiles/actions/workflows/docs.yml/badge.svg)](https://github.com/Nandeep2750/claude-profiles/actions/workflows/docs.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

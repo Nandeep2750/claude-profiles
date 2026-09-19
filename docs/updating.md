@@ -7,14 +7,20 @@ claude-update --check
 ```
 
 ```
-installed: 1.2.0 (v1.2.0)
-available: 1.2.0  (you are up to date)
+installed: 1.4.0 (v1.4.0)
+available: 1.4.0  (you are up to date)
 ```
+
+!!! note "Version numbers on this page are illustrative"
+    The current release is the badge at the top of the
+    [README](https://github.com/Nandeep2750/claude-profiles#readme), or the
+    [releases page](https://github.com/Nandeep2750/claude-profiles/releases).
+    `claude-update --check` always compares against the live latest.
 
 `claude-doctor` prints the same version on its first line, and
 `claude-profiles --version` prints just the number.
 
-The version string carries the git description too, so `1.2.0 (v1.2.0-3-gabc1234)`
+The version string carries the git description too, so `1.4.0 (v1.4.0-3-gabc1234)`
 means three commits past the tag, and a `-dirty` suffix means you have
 uncommitted local changes.
 
@@ -28,8 +34,8 @@ It checks GitHub for a newer release, runs `git pull --ff-only` in your
 `~/.claude-tools` checkout, and shows what changed:
 
 ```
-installed: 1.1.0 (v1.1.0)
-available: 1.2.0  https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.2.0
+installed: 1.4.0 (v1.4.0)
+available: 1.5.0  https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.0
 
 git pull --ff-only
 
@@ -78,7 +84,7 @@ your rc file, and it does not touch account data.
 
 ```sh
 cd ~/.claude-tools
-git checkout v1.1.0
+git checkout v1.4.0     # any tag from the releases page
 ```
 
 `claude-update` will then report a newer release available but refuse to pull,

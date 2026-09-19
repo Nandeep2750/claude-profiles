@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-09-19
+
+### Added
+
+- **`claude-profiles statusline --install` / `--install-all`** write the
+  `statusLine` setting into a profile's `settings.json`, so enabling the status
+  line no longer means hand-editing JSON in each profile. An existing status
+  line from another tool is left alone unless `--force` is passed.
+
+### Changed
+
+- The `cost` segment is documented as what a session's tokens would cost at API
+  rates, not a charge on a subscription.
+- A live release badge on the README and documentation home, so the current
+  version is visible without trusting prose that can go stale.
+
 ## [1.4.0] - 2026-09-19
 
 ### Added
@@ -127,6 +143,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.5.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.0
 [1.4.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.3.0
 [1.2.1]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.2.1
