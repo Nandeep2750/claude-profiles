@@ -63,9 +63,12 @@ claude-profiles
 ```
 
 ```
-   PROFILE  CONFIG DIR                        ACCOUNT                  AUTH
-*  work     ~/.claude-profiles/work           you@company.com          ok
-   default  ~/.claude                         you@example.com          ok
+╭──────────┬─────────────────┬──────┬────────┬───────────┬───────┬───────────┬─────────╮
+│ PROFILE  │ ACCOUNT         │ AUTH │ 5-HOUR │ RESETS    │ 7-DAY │ RESETS    │   AS OF │
+├──────────┼─────────────────┼──────┼────────┼───────────┼───────┼───────────┼─────────┤
+│ * work   │ you@company.com │ ok   │     3% │ in 1h 13m │    7% │ in 2d 18h │  2m ago │
+│   default│ you@example.com │ ok   │    59% │ in 53m    │   40% │ in 4d 23h │  1h ago │
+╰──────────┴─────────────────┴──────┴────────┴───────────┴───────┴───────────┴─────────╯
 ```
 
 Both signed in at once. Switching logs nothing out.

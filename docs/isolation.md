@@ -15,9 +15,12 @@ would have picked up those credentials.
 
 ```console
 $ claude-profiles
-   PROFILE  CONFIG DIR                        ACCOUNT                  AUTH
-*  default  ~/.claude                         you@example.com          ok
-   work     ~/.claude-profiles/work           (not logged in)          none
+╭──────────┬─────────────────┬──────┬────────┬───────────┬───────┬───────────┬────────────╮
+│ PROFILE  │ ACCOUNT         │ AUTH │ 5-HOUR │ RESETS    │ 7-DAY │ RESETS    │      AS OF │
+├──────────┼─────────────────┼──────┼────────┼───────────┼───────┼───────────┼────────────┤
+│ * default│ you@example.com │ ok   │    59% │ in 53m    │   40% │ in 4d 23h │     1h ago │
+│   work   │ (not logged in) │ none │      - │ -         │     - │ -         │ never used │
+╰──────────┴─────────────────┴──────┴────────┴───────────┴───────┴───────────┴────────────╯
 ```
 
 ## What that means day to day
