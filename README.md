@@ -186,6 +186,29 @@ It tells you whether the change needs a shell restart, refuses to run over local
 edits, and never touches your account data.
 [More →](https://nandeep2750.github.io/claude-profiles/updating/)
 
+## Knowing which account you are on
+
+Two indicators, because the shell prompt vanishes once Claude Code takes over
+the terminal:
+
+```sh
+claude-profiles statusline --install-all    # inside Claude Code
+```
+
+```
+work │ you@company.com │ ⎇ main │ ctx 52%/1000k │ 5h 2% │ 7d 3%
+```
+
+```sh
+export CLAUDE_PROFILE_PROMPT=1              # in your shell prompt
+```
+
+```
+~/projects/client-work %                              claude:client
+```
+
+[More →](https://nandeep2750.github.io/claude-profiles/settings/#knowing-which-profile-is-active)
+
 ## Settings
 
 Set these before the `source` line in your rc file:

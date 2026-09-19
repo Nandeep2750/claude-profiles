@@ -103,6 +103,48 @@ exactly - it is case-sensitive.
 Changing an already-running `claude` is not possible; the profile is read at
 launch. Restart it.
 
+## The status line does not appear in Claude Code
+
+```sh
+claude-profiles statusline --install-all
+```
+
+Then **start a new session** - the setting is read at launch, so an already-open
+one will not pick it up.
+
+If it still does not show, check the profile's `settings.json` has a
+`statusLine` entry, and that the command runs on its own:
+
+```sh
+echo '{}' | claude-profiles statusline --show profile,account
+```
+
+Remember settings are per-profile: installing it while on one profile does
+nothing for the others, which is what `--install-all` is for.
+
+## The status line shows the wrong profile
+
+It reads `CLAUDE_CONFIG_DIR` from the environment Claude Code was launched
+with. If it disagrees with `claude-profile`, the session was started before you
+switched - the profile is fixed at launch. Exit and start it again.
+
+## The prompt indicator does not appear
+
+`CLAUDE_PROFILE_PROMPT=1` must be set **before** the line that sources the
+shell layer, because the layer reads it at load time.
+
+```sh
+grep -n "CLAUDE_PROFILE_PROMPT\|claude-profiles.zsh" ~/.zshrc
+echo $RPROMPT     # expect: %F{242}$(claude_profile_prompt)%f
+```
+
+If `RPROMPT` is empty or something else, a later line in your rc file - a
+prompt theme, for instance - has overwritten it. Move the `source` line after
+whatever sets your prompt.
+
+It stays deliberately silent on `default`. Set `CLAUDE_PROFILE_SHOW_DEFAULT=1`
+to show it everywhere.
+
 ## Both accounts hit their limits
 
 Handoff moves a conversation, not quota. Check what you actually have:

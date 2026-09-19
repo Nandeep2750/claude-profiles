@@ -121,6 +121,22 @@ see [How it works](how-it-works.md) for the details.
 
 Full flag reference: [Commands](commands.md).
 
+## Knowing which account you are on
+
+The shell prompt vanishes once Claude Code takes over the terminal, so there are
+two indicators:
+
+```sh
+claude-profiles statusline --install-all    # inside Claude Code
+export CLAUDE_PROFILE_PROMPT=1              # in your shell prompt
+```
+
+```
+work │ you@company.com │ ⎇ main │ ctx 52%/1000k │ 5h 2% │ 7d 3%
+```
+
+[Set them up →](settings.md#knowing-which-profile-is-active)
+
 ## Supported platforms
 
 macOS, Linux, WSL, Git-Bash, and native Windows PowerShell. Requires `python3`

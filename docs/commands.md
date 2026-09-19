@@ -600,6 +600,26 @@ tells you whether the change needs a shell restart.
 
 ---
 
+## `claude-update`
+
+Check for and pull a newer version. Covered in full on the
+[Updating](updating.md) page.
+
+```sh
+claude-update --check    # what is installed, and what is available
+claude-update            # pull it
+```
+
+| Flag | Effect |
+|---|---|
+| `-c`, `--check` | report only, change nothing |
+
+It refuses to run over uncommitted local edits, uses `git pull --ff-only`, and
+tells you whether the change needs a shell restart - changes under `bin/` take
+effect immediately, changes under `shell/` do not.
+
+---
+
 ## `claude-profiles.py path NAME`
 
 Print a profile's config directory. Useful in scripts.

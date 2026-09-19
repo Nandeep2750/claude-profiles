@@ -43,6 +43,31 @@ indicator or nothing, and touches no other state.
 PROMPT='%~ $(claude_profile_prompt) %# '
 ```
 
+## Knowing which profile is active
+
+Two indicators cover two different places, and you probably want both:
+
+| Where you are | What tells you | Set up with |
+|---|---|---|
+| Your shell | the prompt indicator | `CLAUDE_PROFILE_PROMPT=1`, above |
+| Inside a Claude Code session | the status line | `claude-profiles statusline --install-all` |
+
+The shell prompt disappears the moment Claude Code takes over the terminal,
+which is exactly when knowing the account matters most - so the status line is
+not a duplicate of it.
+
+```sh
+claude-profiles statusline --install-all
+```
+
+```
+work │ you@company.com │ ⎇ main │ ctx 52%/1000k │ 5h 2% │ 7d 3%
+```
+
+Choose what it shows with `--show`; the segments are listed in the
+[command reference](commands.md#claude-profiles-statusline). Settings are
+per-profile, which is why `--install-all` exists.
+
 ## `CLAUDE_PROFILE_HOME`
 
 Where account data lives. Defaults to `~/.claude-profiles`. Set it before

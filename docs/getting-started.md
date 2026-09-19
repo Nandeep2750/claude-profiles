@@ -103,6 +103,22 @@ servers went.
 - [Session handoff](guides/handoff.md) - continue a conversation on another account
 - [What's shared, what isn't](isolation.md) - why a new profile starts empty
 
+## See which profile you are on
+
+Two one-off settings worth doing now, so you never use the wrong account by
+accident:
+
+```sh
+claude-profiles statusline --install-all    # inside Claude Code sessions
+```
+
+```sh
+echo 'export CLAUDE_PROFILE_PROMPT=1' >> ~/.zshrc   # in your shell prompt
+```
+
+The prompt indicator must be set **before** the line that sources the shell
+layer. Both are covered in [Settings](settings.md#knowing-which-profile-is-active).
+
 ## Uninstall
 
 Remove the `source` line from your rc file and delete `~/.claude-tools`.
