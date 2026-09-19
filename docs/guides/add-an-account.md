@@ -48,7 +48,7 @@ Setting `CLAUDE_CONFIG_DIR` relocates everything, not just the login: settings,
 MCP servers, plugins, permissions and session history are all per-profile. That
 is usually what you want for work/client separation, but it does mean a new
 profile starts empty. Full detail:
-[What's shared, what isn't](../isolation.md).
+[What's shared, what isn't](../internals/shared.md).
 
 To copy settings across:
 
@@ -76,5 +76,5 @@ claude-profile-remove work
 
 That deletes the profile, its conversations and its stored credentials, after
 asking you to confirm. Use it rather than `rm -rf` - on macOS the credentials
-live in the Keychain, and deleting the directory by hand leaves an orphaned
+live in the Keychain, and deleting the directory by hand leaves an left behind
 entry behind.

@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-09-19
+
+### Changed
+
+- **The documentation site is restructured.** Seven top-level tabs replace one
+  long sidebar, and the 631-line command reference is split into an overview
+  plus six grouped pages - switching profiles, usage and limits, sessions,
+  managing profiles, the status line, and health and updates. No page is now
+  longer than 184 lines.
+- Guides and How it works each gained a landing page, so a section is something
+  you can arrive at rather than only pass through.
+- Settings and Updating left the "Reference" grouping. Settings is a top-level
+  tab; Updating sits with How it works.
+- A plain-English pass across every page: hard words replaced, long sentences
+  split, and the jargon that had crept in removed.
+
 ## [1.5.3] - 2026-09-19
 
 ### Fixed
@@ -195,6 +211,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.6.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.6.0
 [1.5.3]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.3
 [1.5.2]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.2
 [1.5.1]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.5.1

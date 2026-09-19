@@ -18,7 +18,7 @@ grep claude-profiles ~/.zshrc        # or ~/.bashrc - is the source line there?
 
 New terminals pick it up automatically; only already-open ones need reloading.
 Re-run `sh ~/.claude-tools/install.sh` if the line is genuinely absent - it is
-idempotent and will not duplicate anything.
+safe to run twice and will not duplicate anything.
 
 ## Tab completion does not work
 
@@ -112,8 +112,9 @@ claude-profiles statusline --install-all
 Then **start a new session** - the setting is read at launch, so an already-open
 one will not pick it up.
 
-If it still does not show, check the profile's `settings.json` has a
-`statusLine` entry, and that the command runs on its own:
+If it still does not show, check two things. First, that the profile's
+`settings.json` has a `statusLine` entry. Second, that the command runs on its
+own:
 
 ```sh
 echo '{}' | claude-profiles statusline --show profile,account
@@ -142,8 +143,8 @@ If `RPROMPT` is empty or something else, a later line in your rc file - a
 prompt theme, for instance - has overwritten it. Move the `source` line after
 whatever sets your prompt.
 
-It stays deliberately silent on `default`. Set `CLAUDE_PROFILE_SHOW_DEFAULT=1`
-to show it everywhere.
+It stays silent on `default` by design. Set `CLAUDE_PROFILE_SHOW_DEFAULT=1` to
+show it everywhere.
 
 ## Both accounts hit their limits
 

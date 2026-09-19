@@ -154,7 +154,7 @@ So each profile gets its own login, and signing into one cannot disturb another.
 Nothing here patches Claude Code — it sets an environment variable Claude Code
 already reads, and copies transcript files Claude Code already understands.
 Remove it and `claude` keeps working unchanged.
-[Details →](https://nandeep2750.github.io/claude-profiles/how-it-works/)
+[Details →](https://nandeep2750.github.io/claude-profiles/internals/)
 
 ## Two directories, kept apart
 
@@ -169,7 +169,7 @@ Profiles also share nothing with **each other** — MCP servers, plugins, settin
 and conversation history are all per-profile, and nothing is inherited from
 `~/.claude`. The one exception is files inside a project folder (`.mcp.json`,
 `CLAUDE.md`), which every profile reads.
-[What's shared, what isn't →](https://nandeep2750.github.io/claude-profiles/isolation/)
+[What's shared, what isn't →](https://nandeep2750.github.io/claude-profiles/internals/shared/)
 
 > [!WARNING]
 > On macOS a profile's Keychain entry is keyed to its **absolute path**. Moving
@@ -184,7 +184,7 @@ claude-update            # pull the newer version
 
 It tells you whether the change needs a shell restart, refuses to run over local
 edits, and never touches your account data.
-[More →](https://nandeep2750.github.io/claude-profiles/updating/)
+[More →](https://nandeep2750.github.io/claude-profiles/internals/updating/)
 
 ## Knowing which account you are on
 
@@ -230,8 +230,8 @@ PowerShell.
 
 - **[Getting started](https://nandeep2750.github.io/claude-profiles/getting-started/)** — install and first profile
 - **[Commands](https://nandeep2750.github.io/claude-profiles/commands/)** — every command and flag
-- **[What's shared, what isn't](https://nandeep2750.github.io/claude-profiles/isolation/)** — profile isolation, and the one exception
-- **[How it works](https://nandeep2750.github.io/claude-profiles/how-it-works/)** — mechanism and storage layout
+- **[What's shared, what isn't](https://nandeep2750.github.io/claude-profiles/internals/shared/)** — profile isolation, and the one exception
+- **[How it works](https://nandeep2750.github.io/claude-profiles/internals/)** — mechanism and storage layout
 - **[Settings](https://nandeep2750.github.io/claude-profiles/settings/)** — environment variables
 - **[Troubleshooting](https://nandeep2750.github.io/claude-profiles/troubleshooting/)** — common problems and fixes
 - **[Changelog](CHANGELOG.md)** — what changed, and when

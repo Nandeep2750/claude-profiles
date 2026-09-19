@@ -105,8 +105,8 @@ git clone https://github.com/Nandeep2750/claude-profiles.git ~/.claude-tools
 sh ~/.claude-tools/install.sh
 ```
 
-Reinstalling is safe and idempotent: it will not duplicate the `source` line in
-your rc file, and it does not touch account data.
+Reinstalling is safe to run twice. It will not add a second `source` line to your
+rc file, and it never touches account data.
 
 ## Pinning a version
 

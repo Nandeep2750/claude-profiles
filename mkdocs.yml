@@ -11,15 +11,22 @@ theme:
   icon:
     repo: fontawesome/brands/github
   features:
+    - navigation.tabs            # top-level sections as tabs in the header
+    - navigation.tabs.sticky     # keep them visible when scrolling
+    - navigation.sections        # group sub-pages in the sidebar
+    - navigation.indexes         # a section can have its own landing page
+    - navigation.path            # breadcrumbs
     - navigation.instant
     - navigation.tracking
-    - navigation.sections
     - navigation.top
     - navigation.footer
     - toc.follow
     - search.suggest
     - search.highlight
+    - search.share
     - content.code.copy
+    - content.code.annotate
+    - content.tabs.link          # OS tabs stay in sync across the page
     - content.action.edit
   palette:
     - media: "(prefers-color-scheme)"
@@ -45,15 +52,23 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Guides:
+      - guides/index.md
       - Add an account: guides/add-an-account.md
       - Per-project accounts: guides/per-project.md
       - Session handoff: guides/handoff.md
-  - Reference:
-      - Commands: commands.md
-      - Settings: settings.md
-      - Updating: updating.md
-      - What's shared, what isn't: isolation.md
-      - How it works: how-it-works.md
+  - Commands:
+      - commands/index.md
+      - Switching profiles: commands/profiles.md
+      - Usage and limits: commands/usage.md
+      - Sessions: commands/sessions.md
+      - Managing profiles: commands/manage.md
+      - Status line: commands/statusline.md
+      - Health and updates: commands/maintenance.md
+  - Settings: settings.md
+  - How it works:
+      - internals/index.md
+      - What is shared: internals/shared.md
+      - Updating: internals/updating.md
   - Troubleshooting: troubleshooting.md
 
 markdown_extensions:

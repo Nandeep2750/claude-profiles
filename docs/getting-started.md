@@ -99,7 +99,7 @@ Both directories are created for you. `install.sh` creates
 
 Profiles also share nothing with each other - MCP servers, plugins, settings and
 conversation history are all per-profile. See
-[What's shared, what isn't](isolation.md) before you wonder where your MCP
+[What's shared, what isn't](internals/shared.md) before you wonder where your MCP
 servers went.
 
 !!! danger "Do not move a profile directory after logging in"
@@ -111,7 +111,7 @@ servers went.
 - [Add an account](guides/add-an-account.md)
 - [Per-project accounts](guides/per-project.md) - switch automatically on `cd`
 - [Session handoff](guides/handoff.md) - continue a conversation on another account
-- [What's shared, what isn't](isolation.md) - why a new profile starts empty
+- [What's shared, what isn't](internals/shared.md) - why a new profile starts empty
 
 ## See which profile you are on
 

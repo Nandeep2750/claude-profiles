@@ -87,18 +87,18 @@ claude-profiles --live
 It fetches each signed-in account's current usage in parallel and costs **no
 model tokens** - it reads a usage endpoint, it does not run a prompt. Any
 profile whose fetch fails falls back to its cached value rather than breaking
-the table. [More →](commands.md#live-figures)
+the table. [More →](commands/usage.md#live-figures)
 
 !!! info "Profiles share nothing"
     Each profile is a complete, separate copy of Claude Code's configuration -
     MCP servers, plugins, settings and conversation history included. See
-    [What's shared, what isn't](isolation.md).
+    [What's shared, what isn't](internals/shared.md).
 
 ## How it works, in one line
 
 Claude Code reads `CLAUDE_CONFIG_DIR` and derives its credential slot from that
 path, so each profile gets its own login. Nothing here patches Claude Code -
-see [How it works](how-it-works.md) for the details.
+see [How it works](internals/index.md) for the details.
 
 ## Commands
 
@@ -119,7 +119,7 @@ see [How it works](how-it-works.md) for the details.
 | `claude-prune` | Delete old transcripts (dry run by default) |
 | `claude-profiles --live` | Current usage figures instead of the cached snapshot |
 
-Full flag reference: [Commands](commands.md).
+Full flag reference: [Commands](commands/index.md).
 
 ## Knowing which account you are on
 

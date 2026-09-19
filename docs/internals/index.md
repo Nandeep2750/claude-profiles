@@ -1,8 +1,32 @@
 # How it works
 
-Nothing here patches or wraps Claude Code. It sets one environment variable that
-Claude Code already reads, and copies transcript files that Claude Code already
-understands. Remove this tooling and `claude` keeps working unchanged.
+Nothing here patches or wraps Claude Code. The tool sets one environment
+variable that Claude Code already reads, and copies transcript files that
+Claude Code already understands. Remove it and `claude` keeps working.
+
+<div class="grid cards" markdown>
+
+-   :material-cog: **This page**
+
+    ---
+
+    The mechanism, where credentials live, and what a profile contains.
+
+-   :material-share-variant-outline: **[What is shared](shared.md)**
+
+    ---
+
+    Why a new profile starts empty, and the one thing profiles do share.
+
+-   :material-update: **[Updating](updating.md)**
+
+    ---
+
+    Moving to a newer version, and when you need to reload your shell.
+
+</div>
+
+---
 
 ## The mechanism
 
@@ -63,7 +87,7 @@ Setting `CLAUDE_CONFIG_DIR` relocates everything, not just the login:
 ```
 
 So profiles do not share MCP servers, permissions or settings - see
-[What's shared, what isn't](isolation.md) for the full picture, including the
+[What's shared, what isn't](shared.md) for the full picture, including the
 one exception (files inside a project folder). To copy settings across:
 
 ```sh
@@ -91,7 +115,7 @@ file snapshots. Every line also records its own `cwd`, which is what
 reconstructing the encoded directory name.
 
 `claude --resume` only looks inside the active profile's `projects/`. That is
-precisely why handoff is needed: the other account is not hiding the
+exactly why handoff is needed: the other account is not hiding the
 conversation, it genuinely cannot see the file.
 
 ## What handoff actually does
@@ -118,7 +142,7 @@ current directory looking for a `.claude-profile` file, and switches to the name
 inside it. No match means `default`.
 
 The walk is plain shell with an early-exit guard when the directory has not
-changed, so it costs nothing per prompt. It deliberately does not shell out to
+changed, so it costs nothing per prompt. It does not shell out to
 Python, which would add ~50ms to every `cd`.
 
 ## Layout

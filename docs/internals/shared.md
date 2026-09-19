@@ -34,7 +34,7 @@ $ claude-profiles
 | Add a skill or agent | not there |
 | Have 50 conversations | sees none of them |
 
-That last row is exactly why [session handoff](guides/handoff.md) exists. The
+That last row is exactly why [session handoff](../guides/handoff.md) exists. The
 other account is not hiding your conversation - it genuinely cannot see the
 file, so handoff physically copies it.
 

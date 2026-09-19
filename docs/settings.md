@@ -53,7 +53,7 @@ parent's rule:
 echo personal > ~/projects/<project-name>/experiment/.claude-profile
 ```
 
-Markers are just files: delete one to remove the rule, `cat` one to see it, and
+Markers are just files. Delete one to remove the rule, or `cat` one to see it.
 `claude-doctor` reports any that name a profile which does not exist.
 
 See [Per-project accounts](guides/per-project.md) for the full guide.
@@ -71,9 +71,11 @@ source "$HOME/.claude-tools/shell/claude-profiles.zsh"
 Set it before the `source` line, in `~/.zshrc` or `~/.bashrc`.
 
 This is the machine-wide fallback, not a per-project setting - it applies
-wherever no marker matches. It earns its keep when `default` is not the account
-you want to land on: after logging out of it, or if your original `~/.claude`
-belongs to an account you rarely use.
+wherever no marker matches.
+
+It is worth setting when `default` is not the account you want to land on - after
+logging out of it, for instance, or if your original `~/.claude` belongs to an
+account you rarely use.
 
 !!! tip "A marker always wins"
     Setting this does not disturb directories that already have a
@@ -86,8 +88,8 @@ directory does much the same job:
 echo work > ~/.claude-profile
 ```
 
-The difference: the variable applies wherever your rc file is loaded, while a
-marker at `~` is a real file that anything walking upward will also find.
+The difference is small. The variable applies wherever your rc file is loaded. A
+marker at `~` is a real file, so anything walking upward finds it too.
 
 ## `CLAUDE_PROFILE_PROMPT`
 
@@ -137,7 +139,7 @@ work │ you@company.com │ ⎇ main │ ctx 52%/1000k │ 5h 2% │ 7d 3%
 ```
 
 Choose what it shows with `--show`; the segments are listed in the
-[command reference](commands.md#claude-profiles-statusline). Settings are
+[command reference](commands/statusline.md#claude-profiles-statusline). Settings are
 per-profile, which is why `--install-all` exists.
 
 ## `CLAUDE_PROFILE_HOME`

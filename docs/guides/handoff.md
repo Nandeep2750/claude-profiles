@@ -93,7 +93,7 @@ Only the profile root changes. The file is byte-for-byte identical, so every
 working directory recorded inside it still points at the original project.
 
 `claude --resume` only looks inside the active profile's `projects/` directory.
-That is precisely why handoff is needed - the other account is not hiding the
+That is exactly why handoff is needed - the other account is not hiding the
 conversation, it genuinely cannot see the file.
 
 !!! note "Cost"

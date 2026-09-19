@@ -56,7 +56,7 @@ A shell hook (`chpwd` in zsh, `PROMPT_COMMAND` in bash) walks up from the
 current directory looking for the file and switches to the name inside it.
 
 It is plain shell with an early-exit guard when the directory has not changed,
-so it costs nothing per prompt. It deliberately does not shell out to Python,
+so it costs nothing per prompt. It does not shell out to Python,
 which would add noticeable latency to every `cd`.
 
 !!! note "Already-running sessions are unaffected"
