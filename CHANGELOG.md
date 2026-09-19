@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-09-19
+
+### Added
+
+- **`claude-profiles statusline`** — a status line for use inside Claude Code,
+  where the shell prompt is not visible. Shows the active profile, account,
+  git branch, context window, rate limits and session cost, configurable with
+  `--show`. Rate limits and context come from the payload Claude Code passes
+  in, so they are current without an extra network call.
+
 ## [1.3.0] - 2026-09-19
 
 ### Changed
@@ -115,6 +125,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.4.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.3.0
 [1.2.1]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.2.1
 [1.2.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.2.0

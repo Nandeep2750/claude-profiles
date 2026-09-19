@@ -110,6 +110,7 @@ see [How it works](how-it-works.md) for the details.
 | `claude-profile-clone SRC DST` | Seed a profile's settings from another one |
 | `claude-doctor` | Check the installation for problems |
 | `claude-update` | Check for and pull a newer version |
+| `claude-profiles statusline` | A status line for inside Claude Code |
 | `claude-auto` | Launch Claude on whichever account has the most room |
 | `claude-best` | Which account has the most headroom |
 | `claude-prune` | Delete old transcripts (dry run by default) |

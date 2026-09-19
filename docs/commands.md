@@ -18,6 +18,7 @@
 | [`claude-prune`](#claude-prune) | Delete old transcripts (dry run by default) |
 | [`claude-doctor`](#claude-profiles-doctor) | Check the installation for problems |
 | [`claude-update`](#claude-update) | Check for and pull a newer version |
+| [`claude-profiles statusline`](#claude-profiles-statusline) | A status line for inside Claude Code |
 
 Names used throughout these examples - `default`, `work`, `client` - are
 placeholders. Profiles can be called anything.
@@ -505,7 +506,55 @@ and the command tells you what it skipped.
 
 ---
 
-## `claude-update`
+## `claude-profiles statusline`
+
+Inside a Claude Code session the shell prompt is gone, so the profile indicator
+is not visible. This renders a status line for Claude Code's own `statusLine`
+setting instead.
+
+```
+work │ you@company.com │ ⎇ main │ ctx 52%/1000k │ 5h 2% │ 7d 3% │ $12.40
+```
+
+Enable it in the profile's `settings.json`:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "python3 \"$HOME/.claude-tools/bin/claude-profiles.py\" statusline --show profile,account,branch,context,limits,cost",
+    "padding": 0
+  }
+}
+```
+
+Settings are per-profile, so add it to each profile you want it on.
+
+### Segments
+
+`--show` takes a comma-separated list, rendered in the order you give:
+
+| Segment | Shows |
+|---|---|
+| `profile` | the active profile - dim on `default`, magenta otherwise |
+| `account` | the signed-in email |
+| `model` | model name, plus effort level when it is not the default |
+| `dir` | the current directory's basename |
+| `branch` | the git branch |
+| `context` | context window used, colour-coded |
+| `limits` | 5-hour and 7-day usage, each its own segment |
+| `cost` | session cost so far |
+| `lines` | lines added and removed this session |
+| `version` | the Claude Code version |
+| `session` | the session name |
+
+Percentages are green below 75%, amber from 75%, red from 90% - the same scale
+`claude-profiles` uses.
+
+!!! note "These figures come from Claude Code, not the cache"
+    Claude Code passes current rate limits and context usage to the status line
+    on every render, so `limits` here is live without any network call of its
+    own. If a payload ever lacks them, it falls back to the cached snapshot.
 
 Check for and pull a newer version. Covered in full on the
 [Updating](updating.md) page.

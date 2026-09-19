@@ -26,7 +26,7 @@ import time
 import urllib.error
 import urllib.request
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -987,6 +987,118 @@ def cmd_update(a):
     return 0
 
 
+SEG = " \033[2m│\033[0m "
+
+
+def _dim(t):
+    return f"\033[2m{t}\033[0m"
+
+
+def _tone(pct, text):
+    c = 31 if pct >= 90 else (33 if pct >= 75 else 32)
+    return f"\033[{c}m{text}\033[0m"
+
+
+def cmd_statusline(a):
+    """One line for Claude Code's statusLine setting.
+
+    Claude Code pipes a JSON payload on stdin - rate limits, context usage,
+    cost, model - and renders whatever we print. The active profile comes from
+    CLAUDE_CONFIG_DIR, which the child process inherits.
+    """
+    try:
+        blob = json.load(sys.stdin) if not sys.stdin.isatty() else {}
+    except Exception:
+        blob = {}
+    if not isinstance(blob, dict):
+        blob = {}
+
+    def sub(key):
+        v = blob.get(key)
+        return v if isinstance(v, dict) else {}
+
+    name = active_profile()
+    pdir = profile_dir(name)
+    want = set(a.show.split(",")) if a.show else set()
+    on = lambda k: k in want          # noqa: E731
+
+    parts = []
+    if on("profile"):
+        parts.append(_dim(name) if name == "default" else f"\033[1;35m{name}\033[0m")
+
+    if on("account"):
+        email = account_email(pdir)
+        if email:
+            parts.append(_dim(email))
+
+    if on("model"):
+        m = sub("model").get("display_name")
+        if m:
+            eff = sub("effort").get("level")
+            parts.append(_dim(f"{m} {eff}" if eff and eff != "medium" else m))
+
+    if on("dir"):
+        cwd = sub("workspace").get("current_dir") or blob.get("cwd")
+        if cwd:
+            parts.append(_dim(os.path.basename(cwd.rstrip("/")) or cwd))
+
+    if on("branch"):
+        cwd = sub("workspace").get("current_dir") or blob.get("cwd") or os.getcwd()
+        code, out, _ = _git("rev-parse", "--abbrev-ref", "HEAD", cwd=cwd)
+        if code == 0 and out and out != "HEAD":
+            parts.append(_dim(f"\u2387 {out}"))
+
+    if on("context"):
+        cw = sub("context_window")
+        pct = cw.get("used_percentage")
+        if isinstance(pct, (int, float)):
+            size = cw.get("context_window_size")
+            cell = _tone(pct, f"ctx {pct:g}%")
+            if size:
+                cell += _dim(f"/{int(size) // 1000}k")
+            parts.append(cell)
+
+    if on("limits"):
+        rl = sub("rate_limits")
+        bits = []
+        for key, label in (("five_hour", "5h"), ("seven_day", "7d")):
+            b = rl.get(key)
+            if isinstance(b, dict) and b.get("used_percentage") is not None:
+                pct = b["used_percentage"]
+                bits.append(_tone(pct, f"{label} {pct:g}%"))
+        if not bits:                     # payload had none - fall back to the cache
+            u = usage_of(pdir)
+            for key, label in (("5h", "5h"), ("7d", "7d")):
+                b = (u or {}).get(key)
+                if b and b.get("pct") is not None:
+                    bits.append(_tone(b["pct"], f"{label} {b['pct']:g}%"))
+        parts += bits                    # each limit is its own segment
+
+    if on("cost"):
+        c = sub("cost").get("total_cost_usd")
+        if isinstance(c, (int, float)) and c > 0:
+            parts.append(_dim(f"${c:.2f}"))
+
+    if on("lines"):
+        c = sub("cost")
+        add, rem = c.get("total_lines_added"), c.get("total_lines_removed")
+        if add or rem:
+            parts.append(f"\033[32m+{add or 0}\033[0m/\033[31m-{rem or 0}\033[0m")
+
+    if on("version"):
+        v = blob.get("version")
+        if v:
+            parts.append(_dim(f"cc {v}"))
+
+    if on("session"):
+        n = blob.get("session_name")
+        if n:
+            parts.append(_dim(n[:40]))
+
+    print(SEG.join(parts))
+    return 0
+
+
 def cmd_doctor(a):
     C = color()
     issues, warns = [], []
@@ -1149,6 +1261,13 @@ def main():
     p.add_argument("target")
     p.add_argument("-f", "--force", action="store_true", help="overwrite what is already there")
     p.set_defaults(fn=cmd_clone)
+
+    p = sub.add_parser("statusline", help="one-line status for Claude Code's statusLine")
+    p.add_argument("--show", default="profile,account,limits",
+                   help="comma-separated segments, in order of preference: "
+                        "profile, account, model, dir, branch, context, limits, "
+                        "cost, lines, version, session")
+    p.set_defaults(fn=cmd_statusline)
 
     p = sub.add_parser("doctor", help="check the installation for problems")
     p.set_defaults(fn=cmd_doctor)
