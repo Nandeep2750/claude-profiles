@@ -20,7 +20,10 @@ TMP=$(mktemp -d 2>/dev/null || mktemp -d -t cp)
 export HOME="$TMP"
 export CLAUDE_PROFILE_HOME="$TMP/.claude-profiles"
 mkdir -p "$HOME/.claude" "$CLAUDE_PROFILE_HOME"
-unset CLAUDE_CONFIG_DIR CLAUDE_PROFILE_NAME 2>/dev/null || true
+# do not inherit the developer's own settings - these tests assert on defaults
+unset CLAUDE_CONFIG_DIR CLAUDE_PROFILE_NAME CLAUDE_DEFAULT_PROFILE \
+      CLAUDE_PROFILE_PROMPT CLAUDE_PROFILE_SHOW_DEFAULT \
+      CLAUDE_PROFILE_PROMPT_PREFIX 2>/dev/null || true
 
 printf 'shell layer (%s)\n' "$SH_NAME"
 # shellcheck disable=SC1090

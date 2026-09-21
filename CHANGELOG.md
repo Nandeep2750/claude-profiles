@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3] - 2026-09-21
+
+### Fixed
+
+- **`claude-profile` and `claude-profiles` with no arguments crashed in a shell
+  running `set -u`** with "$1: unbound variable" - the most basic documented
+  usage. The zsh prompt setup read `$RPROMPT` unguarded and failed the same
+  way. Every parameter reference in both shell layers is now guarded.
+
+### Added
+
+- The shell and end-to-end tests now clear every `CLAUDE_*` setting before
+  running. They inherited the developer's own environment, so setting
+  `CLAUDE_DEFAULT_PROFILE` locally made two tests fail for a reason that had
+  nothing to do with the code.
+- **`tests/test_docs_commands.sh`** extracts every command shown in the
+  documentation and runs it in a throwaway `HOME`, so the docs and the tool
+  cannot drift apart. It also checks the functions survive `set -u`. In CI for
+  bash and zsh.
+
 ## [1.7.2] - 2026-09-21
 
 ### Fixed
@@ -250,6 +270,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.7.3]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.3
 [1.7.2]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.2
 [1.7.1]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.1
 [1.7.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.0

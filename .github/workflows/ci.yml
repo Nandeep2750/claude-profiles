@@ -42,11 +42,15 @@ jobs:
       - name: End to end (bash)
         run: bash tests/test_e2e.sh
 
+      - name: Documented commands (bash)
+        run: bash tests/test_docs_commands.sh
+
       - name: Shell layer (zsh)
         run: |
           if ! command -v zsh >/dev/null; then sudo apt-get update -qq && sudo apt-get install -y -qq zsh; fi
           zsh tests/test_shell.sh
           zsh tests/test_e2e.sh
+          zsh tests/test_docs_commands.sh
 
       - name: Syntax check every shell file
         run: |

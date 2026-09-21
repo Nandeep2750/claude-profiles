@@ -19,12 +19,16 @@ bash tests/test_shell.sh                   # shell wiring, bash
 zsh  tests/test_shell.sh                   # shell wiring, zsh
 bash tests/test_e2e.sh                     # every command, run for real
 zsh  tests/test_e2e.sh
+bash tests/test_docs_commands.sh           # every command the docs promise
+zsh  tests/test_docs_commands.sh
 ```
 
-Three layers, deliberately: the unit tests exercise the core directly, the
-shell tests check the wiring, and the end-to-end tests run every user-facing
-command through the shell wrappers and assert on what it prints. A command can
-pass the first two and still be unreachable - that has happened.
+Four layers, on purpose: the unit tests exercise the core directly, the
+shell tests check the wiring, the end-to-end tests run every user-facing command
+through the shell wrappers, and `test_docs_commands.sh` extracts every command
+from the documentation and runs that. A command can pass the first three and
+still be wrong in the docs, or work in a normal shell and break in one running
+`set -u` - both have happened.
 
 Every test runs against a throwaway `HOME`, so your real profiles, credentials
 and conversations are never touched. If a test ever needs the real ones,

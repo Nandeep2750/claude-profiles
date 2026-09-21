@@ -12,20 +12,20 @@ export CLAUDE_PROFILE_HOME
 # Profile names become directory names, so reject anything that could escape
 # CLAUDE_PROFILE_HOME. Mirrors check_name() in bin/claude-profiles.py.
 _claude_valid_name() {
-  [ "$1" = "default" ] && return 0
-  case "$1" in
+  [ "${1:-}" = "default" ] && return 0
+  case "${1:-}" in
     *..*|"") ;;
-    *) case "$1" in [A-Za-z0-9]*) 
-         case "$1" in *[!A-Za-z0-9._-]*) ;; *) return 0 ;; esac ;;
+    *) case "${1:-}" in [A-Za-z0-9]*) 
+         case "${1:-}" in *[!A-Za-z0-9._-]*) ;; *) return 0 ;; esac ;;
        esac ;;
   esac
-  echo "invalid profile name: $1" >&2
+  echo "invalid profile name: ${1:-}" >&2
   echo "names may contain letters, digits, '.', '-' and '_', and must start with a letter or digit" >&2
   return 1
 }
 
 claude-profile() {
-  case "$1" in
+  case "${1:-}" in
     "")      echo "claude profile: ${CLAUDE_PROFILE_NAME:-default}"
              echo "config dir    : ${CLAUDE_CONFIG_DIR:-$HOME/.claude}" ;;
     default) unset CLAUDE_CONFIG_DIR CLAUDE_PROFILE_NAME ;;
@@ -38,7 +38,7 @@ claude-profile() {
 # `claude-profiles` with no subcommand means `status`; a known subcommand passes
 # through. Keep this list in step with the core - tests/test_shell.sh checks it.
 claude-profiles() {
-  case "$1" in
+  case "${1:-}" in
     clone|best|doctor|handoff|path|prune|remove|sessions|status|statusline|update) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
     *)                                          "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@" ;;
   esac
@@ -62,7 +62,7 @@ claude-auto() {
 # Run one command under a profile without switching this shell.
 #   claude-profile-exec work claude -p "summarise this repo"
 claude-profile-exec() {
-  local name="$1"
+  local name="${1:-}"
   if [ -z "$name" ] || [ "$#" -lt 2 ]; then
     echo "usage: claude-profile-exec PROFILE COMMAND [ARGS...]" >&2; return 2
   fi
@@ -81,7 +81,7 @@ claude-handoff()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" handoff  "$@"; }
 
 # Delete a profile. Resets this shell to `default` if it removed the active one.
 claude-profile-remove() {
-  local name="$1"
+  local name="${1:-}"
   "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" remove "$@" || return $?
   [ "$name" = "${CLAUDE_PROFILE_NAME:-default}" ] && claude-profile default
   _claude_profile_last_pwd="__unset__"
