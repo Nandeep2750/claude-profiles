@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.4] - 2026-09-21
+
+### Added
+
+- A screenshot on the README, the documentation home, the usage reference and
+  the handoff guide. It shows two accounts with their limits side by side and
+  a conversation being moved between them - the situation this tool exists for,
+  which is hard to convey in prose.
+
 ## [1.7.3] - 2026-09-21
 
 ### Fixed
@@ -270,6 +279,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.7.4]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.4
 [1.7.3]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.3
 [1.7.2]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.2
 [1.7.1]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.1

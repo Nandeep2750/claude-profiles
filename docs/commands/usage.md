@@ -13,6 +13,12 @@ claude-profiles            # cached, instant
 claude-profiles --live     # current figures
 ```
 
+![Two accounts signed in at once, each with its own 5-hour and 7-day limits](../assets/terminal.png)
+
+The example above shows the situation this tool exists for: `work` has plenty
+of its 5-hour limit left but is 78% through its week, while `personal` is the
+other way round. Neither number alone would tell you which account to use.
+
 ### Live figures
 
 ```sh

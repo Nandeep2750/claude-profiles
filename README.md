@@ -15,6 +15,8 @@ when one hits its usage limit.
 
 ### [📖 Read the documentation](https://nandeep2750.github.io/claude-profiles/)
 
+<img src="docs/assets/terminal.png" alt="claude-profiles showing three accounts with their usage limits, then handing a conversation from one account to another" width="820">
+
 </div>
 
 ---
@@ -58,16 +60,9 @@ See what you have:
 
 ```console
 $ claude-profiles
-╭───────────┬─────────────────────┬──────┬────────┬───────────┬───────┬───────────┬────────────╮
-│ PROFILE   │ ACCOUNT             │ AUTH │ 5-HOUR │ RESETS    │ 7-DAY │ RESETS    │      AS OF │
-├───────────┼─────────────────────┼──────┼────────┼───────────┼───────┼───────────┼────────────┤
-│ * default │ you@example.com     │ ok   │    59% │ in 53m    │   40% │ in 4d 23h │     1h ago │
-│   work    │ you@company.com     │ ok   │     3% │ in 1h 13m │   87% │ in 2d 18h │     2h ago │
-│   client  │ (not logged in)     │ none │      - │ -         │     - │ -         │ never used │
-╰───────────┴─────────────────────┴──────┴────────┴───────────┴───────┴───────────┴────────────╯
 ```
 
-Two accounts signed in at once is normal — that is the whole point. The usage
+See the screenshot above. Two accounts signed in at once is normal — that is the whole point. The usage
 columns tell you which account has room **before** you start, rather than
 finding out mid-conversation. Both limits are shown because they run on separate
 clocks: `work` above is fine for the next five hours but 87% through its week.

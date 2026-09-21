@@ -29,6 +29,8 @@ handed off session 0a9014e8-8806-43cf-98fd-28fad1353923
   claude-profile work && claude --resume 0a9014e8-8806-43cf-98fd-28fad1353923
 ```
 
+![Handing a conversation from one account to another after the first runs low](../assets/terminal.png)
+
 Run that, and you are back in the same conversation with the same memory - on a
 different account with its own quota.
 

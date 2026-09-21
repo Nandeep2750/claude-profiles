@@ -11,6 +11,8 @@ project, and move a conversation between accounts when one hits its usage limit.
 [Get started](getting-started.md){ .md-button .md-button--primary }
 [View on GitHub](https://github.com/Nandeep2750/claude-profiles){ .md-button }
 
+![claude-profiles showing three accounts with their usage limits, then handing a conversation from one account to another](assets/terminal.png)
+
 [![Release](https://img.shields.io/github/v/release/Nandeep2750/claude-profiles?label=release&color=blue)](https://github.com/Nandeep2750/claude-profiles/releases/latest)
 [![CI](https://github.com/Nandeep2750/claude-profiles/actions/workflows/ci.yml/badge.svg)](https://github.com/Nandeep2750/claude-profiles/actions/workflows/ci.yml)
 
