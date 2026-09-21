@@ -27,6 +27,12 @@ jobs:
           cache-dependency-path: requirements-docs.txt
       - run: pip install -r requirements-docs.txt
       - run: mkdocs build --strict
+
+      # A page can exist and still be broken - a redirect stub serves HTTP 200
+      # with no content. This refuses to deploy when that happens.
+      - name: Check the built site
+        run: python3 tests/check_site.py site
+
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
