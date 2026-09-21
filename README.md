@@ -32,6 +32,13 @@ out, and each account can only see its own conversation history.
 | **Hit a usage limit** | stuck, even if another account has capacity | hand the conversation over and continue |
 | **Client projects** | easy to use the wrong account | the right account is picked on `cd` |
 
+## See it work
+
+<img src="docs/assets/demo.gif" alt="Running claude-profiles to see two accounts and their limits, claude-best to find the one with room, then claude-handoff to move the conversation there" width="820">
+
+`work` is 91% through its weekly limit, `personal` has room, and the
+conversation moves across in one command.
+
 ## Quick start
 
 **macOS, Linux, WSL or Git-Bash**

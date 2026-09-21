@@ -49,6 +49,13 @@ three ways:
 
 </div>
 
+## See it work
+
+![Running claude-profiles to see two accounts and their limits, claude-best to find the one with room, then claude-handoff to move the conversation there](assets/demo.gif)
+
+`work` is 91% through its weekly limit, `personal` has room, and the
+conversation moves across in one command.
+
 ## Quick start
 
 ```sh
