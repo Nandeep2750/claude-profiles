@@ -694,6 +694,99 @@ class TestHandoff(Fixture):
         self.assertIn("aaa99999", out)
 
 
+class TestHandoffMemory(Fixture):
+    def setUp(self):
+        super().setUp()
+        self.proj = os.path.join(self.home, "code", "api")
+        os.makedirs(self.proj, exist_ok=True)
+        self.enc = encode_dir(self.proj)
+        transcript(os.path.join(self.home, ".claude", "projects", self.enc,
+                                "mem11111-0000-0000-0000-000000000000.jsonl"),
+                   self.proj, ["work on this"])
+        self.src_mem = os.path.join(self.home, ".claude", "projects", self.enc, "memory")
+        os.makedirs(self.src_mem, exist_ok=True)
+        self.write(self.src_mem, "no-em-dashes.md", "never use em dashes")
+        self.write(self.src_mem, "show-drafts.md", "show drafts first")
+        self.write(self.src_mem, "MEMORY.md",
+                   "- [No em dashes](no-em-dashes.md)\n- [Show drafts](show-drafts.md)")
+
+    def write(self, d, name, body):
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, name), "w") as fh:
+            fh.write(body + "\n")
+
+    def dst_mem(self):
+        return os.path.join(self.ph, "work", "projects", self.enc, "memory")
+
+    def files(self):
+        d = self.dst_mem()
+        return sorted(os.listdir(d)) if os.path.isdir(d) else []
+
+    def test_memory_is_not_copied_without_the_flag(self):
+        self.run_cmd("handoff", "work", "-d", self.proj)
+        self.assertEqual(self.files(), [])
+
+    def test_the_output_mentions_memory_exists(self):
+        _, out, _ = self.run_cmd("handoff", "work", "-d", self.proj)
+        self.assertIn("--with-memory", out)
+
+    def test_with_memory_copies_into_an_empty_target(self):
+        code, _, _ = self.run_cmd("handoff", "work", "-d", self.proj, "--with-memory")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.files(), ["MEMORY.md", "no-em-dashes.md", "show-drafts.md"])
+
+    def test_dry_run_changes_nothing(self):
+        code, out, _ = self.run_cmd("handoff", "work", "-d", self.proj,
+                                    "--with-memory", "--dry-run")
+        self.assertEqual(code, 0)
+        self.assertIn("dry run", out)
+        self.assertEqual(self.files(), [])
+        self.assertFalse(os.path.exists(os.path.join(
+            self.ph, "work", "projects", self.enc,
+            "mem11111-0000-0000-0000-000000000000.jsonl")), "the transcript too")
+
+    def test_identical_files_are_left_alone(self):
+        self.write(self.dst_mem(), "no-em-dashes.md", "never use em dashes")
+        _, out, _ = self.run_cmd("handoff", "work", "-d", self.proj, "--with-memory")
+        self.assertIn("already there", out)
+        self.assertNotIn("no-em-dashes.from-default.md", self.files())
+
+    def test_a_real_conflict_keeps_both(self):
+        self.write(self.dst_mem(), "no-em-dashes.md", "em dashes are fine here")
+        _, out, _ = self.run_cmd("handoff", "work", "-d", self.proj, "--with-memory")
+        self.assertIn("side by side", out)
+        self.assertIn("no-em-dashes.from-default.md", self.files())
+        with open(os.path.join(self.dst_mem(), "no-em-dashes.md")) as fh:
+            self.assertIn("fine here", fh.read(), "the target's version must survive")
+
+    def test_a_conflict_is_added_to_the_index(self):
+        self.write(self.dst_mem(), "no-em-dashes.md", "em dashes are fine here")
+        self.write(self.dst_mem(), "MEMORY.md", "- [No em dashes](no-em-dashes.md)")
+        self.run_cmd("handoff", "work", "-d", self.proj, "--with-memory")
+        with open(os.path.join(self.dst_mem(), "MEMORY.md")) as fh:
+            self.assertIn("no-em-dashes.from-default.md", fh.read())
+
+    def test_the_index_is_a_union_not_a_replacement(self):
+        self.write(self.dst_mem(), "local-only.md", "something the target knew")
+        self.write(self.dst_mem(), "MEMORY.md", "- [Local only](local-only.md)")
+        self.run_cmd("handoff", "work", "-d", self.proj, "--with-memory")
+        with open(os.path.join(self.dst_mem(), "MEMORY.md")) as fh:
+            body = fh.read()
+        self.assertIn("local-only.md", body, "the target's own entry must survive")
+        self.assertIn("show-drafts.md", body, "and the incoming ones are added")
+
+    def test_force_memory_replaces(self):
+        self.write(self.dst_mem(), "local-only.md", "gone after --force-memory")
+        self.run_cmd("handoff", "work", "-d", self.proj, "--force-memory")
+        self.assertNotIn("local-only.md", self.files())
+
+    def test_no_memory_to_copy_is_not_an_error(self):
+        shutil.rmtree(self.src_mem)
+        code, out, _ = self.run_cmd("handoff", "work", "-d", self.proj, "--with-memory")
+        self.assertEqual(code, 0)
+        self.assertIn("no memory saved", out)
+
+
 class TestRemove(Fixture):
     def test_refuses_default(self):
         code, _, err = self.run_cmd("remove", "default", "--yes")

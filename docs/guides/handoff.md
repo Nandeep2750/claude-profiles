@@ -38,6 +38,22 @@ different account with its own quota.
     Like forwarding an email thread to your other address. The thread is
     identical; only the mailbox changed.
 
+## Bringing the project's memory too
+
+Claude Code saves memory per profile and per project, and a plain handoff moves
+only the conversation. The conversation carries everything that was said, so you
+can keep working - but facts Claude had saved about the project stay behind.
+
+```sh
+claude-handoff work --with-memory
+```
+
+That merges the saved memory into the other account: new facts are copied,
+existing ones are left alone, and if the same fact differs on both sides **both
+are kept** so you can decide later. Add `--dry-run` to see the plan first.
+
+[Full detail](../commands/sessions.md#carrying-the-projects-memory-across)
+
 ## What it does not do
 
 - **Does not move anything.** It is a copy - the original account keeps its version, so you can switch back.

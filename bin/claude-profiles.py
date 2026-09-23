@@ -26,7 +26,7 @@ import time
 import urllib.error
 import urllib.request
 
-__version__ = "1.8.0"
+__version__ = "1.9.0"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -657,6 +657,112 @@ def cmd_sessions(a):
     return 0
 
 
+MEMORY_DIR = "memory"
+MEMORY_INDEX = "MEMORY.md"
+
+
+def plan_memory_merge(src_mem, dst_mem, source_name):
+    """Work out what merging one memory directory into another would do.
+
+    Memory is one file per fact plus a MEMORY.md index, so merging is a set
+    union rather than an edit of prose. Returns (copy, keep, conflict, index)
+    where conflict holds (source_path, new_name) pairs for files that exist on
+    both sides with different contents - those are kept side by side rather
+    than one silently winning.
+    """
+    copy, keep, conflict = [], [], []
+    for name in sorted(os.listdir(src_mem)):
+        s_path = os.path.join(src_mem, name)
+        if not os.path.isfile(s_path) or name == MEMORY_INDEX:
+            continue
+        d_path = os.path.join(dst_mem, name)
+        if not os.path.exists(d_path):
+            copy.append(name)
+            continue
+        try:
+            with open(s_path, "rb") as sf, open(d_path, "rb") as df:
+                same = sf.read() == df.read()
+        except OSError:
+            same = False
+        if same:
+            keep.append(name)
+        else:
+            stem, ext = os.path.splitext(name)
+            conflict.append((name, f"{stem}.from-{source_name}{ext}"))
+
+    index = merge_index(os.path.join(src_mem, MEMORY_INDEX),
+                        os.path.join(dst_mem, MEMORY_INDEX),
+                        [new for _, new in conflict])
+    return copy, keep, conflict, index
+
+
+def merge_index(src_index, dst_index, renamed):
+    """Union the MEMORY.md pointer lines, keeping the target's order."""
+    def lines(p):
+        try:
+            with open(p) as fh:
+                return fh.read().splitlines()
+        except OSError:
+            return []
+    dst, src = lines(dst_index), lines(src_index)
+    seen = {ln.strip() for ln in dst if ln.strip()}
+    out = list(dst)
+    for ln in src:
+        if ln.strip() and ln.strip() not in seen:
+            out.append(ln)
+            seen.add(ln.strip())
+    for new in renamed:
+        entry = f"- [{os.path.splitext(new)[0]}]({new})"
+        if entry not in seen:
+            out.append(entry)
+    return [ln for ln in out if ln.strip() or out.index(ln) < len(out) - 1]
+
+
+def handle_memory(a, src, dst, enc, source_name, C, D):
+    """Merge the project's memory alongside a handoff. Returns a summary line."""
+    src_mem = os.path.join(src, "projects", enc, MEMORY_DIR)
+    dst_mem = os.path.join(dst, "projects", enc, MEMORY_DIR)
+    if not os.path.isdir(src_mem):
+        return D(f"no memory saved for this project in {source_name}")
+
+    if a.force_memory:
+        if a.dry_run:
+            return C(f"would replace {source_name}'s memory over the target's", "yl")
+        shutil.rmtree(dst_mem, ignore_errors=True)
+        shutil.copytree(src_mem, dst_mem)
+        return C(f"memory replaced from {source_name}", "yl")
+
+    os.makedirs(dst_mem, exist_ok=True)
+    copy, keep, conflict, index = plan_memory_merge(src_mem, dst_mem, source_name)
+
+    if a.dry_run:
+        out = []
+        for n in copy:
+            out.append(f"  {C('copy', 'gr')}     {n}")
+        for n in keep:
+            out.append(D(f"  same     {n}"))
+        for old, new in conflict:
+            out.append(f"  {C('differs', 'yl')}  {old} -> kept as {new}")
+        return "\n".join(out) if out else D("  memory already matches")
+
+    for name in copy:
+        shutil.copy2(os.path.join(src_mem, name), os.path.join(dst_mem, name))
+    for old, new in conflict:
+        shutil.copy2(os.path.join(src_mem, old), os.path.join(dst_mem, new))
+    if index:
+        with open(os.path.join(dst_mem, MEMORY_INDEX), "w") as fh:
+            fh.write("\n".join(index).rstrip() + "\n")
+
+    bits = []
+    if copy:
+        bits.append(f"{len(copy)} copied")
+    if keep:
+        bits.append(D(f"{len(keep)} already there"))
+    if conflict:
+        bits.append(C(f"{len(conflict)} kept side by side", "yl"))
+    return "memory: " + ", ".join(bits) if bits else D("memory already matches")
+
+
 def cmd_handoff(a):
     src_name = a.source or active_profile()
     src = profile_dir(src_name)
@@ -697,15 +803,28 @@ def cmd_handoff(a):
     sid = os.path.basename(f)[:-6]
     enc = os.path.basename(os.path.dirname(f))
     outdir = os.path.join(dst, "projects", enc)
+    C = color()
+    D = lambda t: C(t, "dim")          # noqa: E731
+
+    if a.dry_run:
+        print(C("dry run - nothing will be written", "yl"))
+        print(f"would hand off {C(sid, 'cy')}  {D(f'{src_name} -> {a.target}')}")
+        if a.with_memory or a.force_memory:
+            print(handle_memory(a, src, dst, enc, src_name, C, D))
+        return 0
+
     os.makedirs(outdir, exist_ok=True)
     shutil.copy2(f, os.path.join(outdir, os.path.basename(f)))
 
     info = scan(f)
-    C = color()
     print(f"handed off session {C(sid,'cy')}")
     print(f"  from: {src_name}   to: {a.target}")
     if info and info[0]:
         print(f"  dir : {info[0].replace(HOME,'~')}")
+    if a.with_memory or a.force_memory:
+        print("  " + handle_memory(a, src, dst, enc, src_name, C, D))
+    elif os.path.isdir(os.path.join(src, "projects", enc, MEMORY_DIR)):
+        print(D("  this project has saved memory - add --with-memory to bring it too"))
     print()
     print(f"  claude-profile {a.target} && claude --resume {sid}")
     return 0
@@ -1474,8 +1593,15 @@ def main():
     p = sub.add_parser("handoff", help="copy a session into another profile")
     p.add_argument("target")
     p.add_argument("session", nargs="?")
-    p.add_argument("-s", "--source")
-    p.add_argument("-d", "--dir", default=os.getcwd())
+    p.add_argument("-s", "--source", help="profile to take it from (default: active)")
+    p.add_argument("-d", "--dir", default=os.getcwd(),
+                   help="directory whose conversations to consider")
+    p.add_argument("-m", "--with-memory", action="store_true",
+                   help="also merge this project's saved memory into the target")
+    p.add_argument("--force-memory", action="store_true",
+                   help="replace the target's memory instead of merging")
+    p.add_argument("-n", "--dry-run", action="store_true",
+                   help="show what would happen, change nothing")
     p.set_defaults(fn=cmd_handoff)
 
     a = ap.parse_args()

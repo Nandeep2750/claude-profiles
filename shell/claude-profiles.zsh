@@ -21,6 +21,17 @@ _claude_valid_name() {
 
 claude-profile() {
   case "${1:-}" in
+    -h|--help|help)
+               print -r -- "usage: claude-profile [NAME]"
+               print -r -- ""
+               print -r -- "Switch this shell to a Claude account. With no NAME, shows the active one."
+               print -r -- ""
+               print -r -- "  claude-profile            which profile am I on"
+               print -r -- "  claude-profile work       switch to 'work', creating it if needed"
+               print -r -- "  claude-profile default    back to the original ~/.claude"
+               print -r -- ""
+               print -r -- "Related: claude-profiles, claude-profile-exec, claude-profile-remove"
+               return 0 ;;
     "")        print -r -- "claude profile: ${CLAUDE_PROFILE_NAME:-default}"
                print -r -- "config dir    : ${CLAUDE_CONFIG_DIR:-$HOME/.claude}" ;;
     default)   unset CLAUDE_CONFIG_DIR CLAUDE_PROFILE_NAME ;;
@@ -47,6 +58,18 @@ claude-version()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" --version }
 
 # Launch claude on whichever signed-in account has the most headroom.
 claude-auto() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    print -r -- "usage: claude-auto [CLAUDE ARGS...]"
+    print -r -- ""
+    print -r -- "Launch Claude on whichever signed-in account has the most headroom."
+    print -r -- "Anything you pass is handed to claude itself."
+    print -r -- ""
+    print -r -- "  claude-auto                     an interactive session"
+    print -r -- "  claude-auto -p \"explain this\"   a one-shot prompt"
+    print -r -- ""
+    print -r -- "Related: claude-best (which account it would pick)"
+    return 0
+  fi
   local pick
   pick=$("$CLAUDE_PY" "$CLAUDE_PROFILE_PY" best --quiet) || return $?
   [ -n "$pick" ] || return 1
@@ -145,7 +168,6 @@ _claude_handoff() {
        _describe -t sessions 'session id' ids ;;
   esac
 }
-compdef _claude_handoff claude-handoff
 
 _claude_sessions() {
   _arguments \

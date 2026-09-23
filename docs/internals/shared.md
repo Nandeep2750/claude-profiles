@@ -33,10 +33,22 @@ $ claude-profiles
 | Change a setting | not there |
 | Add a skill or agent | not there |
 | Have 50 conversations | sees none of them |
+| Save memory about a project | not there - see below |
 
 That last row is exactly why [session handoff](../guides/handoff.md) exists. The
 other account is not hiding your conversation - it genuinely cannot see the
 file, so handoff physically copies it.
+
+### Memory is per profile too
+
+Claude Code stores saved memory at
+`<profile>/projects/<encoded-dir>/memory/`, so it is scoped per profile **and**
+per project. Two accounts working on the same repository keep separate memory.
+
+[`claude-handoff --with-memory`](../commands/sessions.md#carrying-the-projects-memory-across)
+merges it across when you move a conversation. For facts that should hold
+whichever account you use, `CLAUDE.md` in the repository is the better home -
+every profile reads it.
 
 ## The one exception: project files
 

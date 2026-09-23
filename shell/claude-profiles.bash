@@ -26,6 +26,17 @@ _claude_valid_name() {
 
 claude-profile() {
   case "${1:-}" in
+    -h|--help|help)
+             echo "usage: claude-profile [NAME]"
+             echo
+             echo "Switch this shell to a Claude account. With no NAME, shows the active one."
+             echo
+             echo "  claude-profile            which profile am I on"
+             echo "  claude-profile work       switch to 'work', creating it if needed"
+             echo "  claude-profile default    back to the original ~/.claude"
+             echo
+             echo "Related: claude-profiles, claude-profile-exec, claude-profile-remove"
+             return 0 ;;
     "")      echo "claude profile: ${CLAUDE_PROFILE_NAME:-default}"
              echo "config dir    : ${CLAUDE_CONFIG_DIR:-$HOME/.claude}" ;;
     default) unset CLAUDE_CONFIG_DIR CLAUDE_PROFILE_NAME ;;
@@ -52,6 +63,18 @@ claude-version()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" --version; }
 
 # Launch claude on whichever signed-in account has the most headroom.
 claude-auto() {
+  if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+    echo "usage: claude-auto [CLAUDE ARGS...]"
+    echo
+    echo "Launch Claude on whichever signed-in account has the most headroom."
+    echo "Anything you pass is handed to claude itself."
+    echo
+    echo "  claude-auto                     an interactive session"
+    echo "  claude-auto -p \"explain this\"   a one-shot prompt"
+    echo
+    echo "Related: claude-best (which account it would pick)"
+    return 0
+  fi
   local pick
   pick=$("$CLAUDE_PY" "$CLAUDE_PROFILE_PY" best --quiet) || return $?
   [ -n "$pick" ] || return 1
@@ -132,7 +155,7 @@ complete -F _claude_profile_complete claude-profile
 complete -F _claude_profile_complete claude-profile-remove
 complete -F _claude_profile_complete claude-profile-exec
 complete -F _claude_profile_complete claude-profile-clone
-complete -F _claude_profile_complete claude-handoff
+complete -W "-m --with-memory --force-memory -n --dry-run -s --source -d --dir" claude-handoff
 complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir --plain -g --grep" claude-sessions
 complete -W "-o --older-than -p --profile -n --limit -y --yes --plain" claude-prune
 complete -W "-c --check" claude-update

@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-09-21
+
+### Added
+
+- **`claude-handoff --with-memory`** carries a project's saved memory across
+  with the conversation. Claude Code stores memory per profile and per project,
+  so a plain handoff left it behind - the conversation continued fine, but the
+  facts Claude reads at the start of a session did not travel.
+
+  It merges rather than overwrites: new facts are copied, existing ones left
+  alone, and a fact that differs on both sides is kept twice, the incoming one
+  as `<name>.from-<source>.md`, with both listed in `MEMORY.md`. Memory is one
+  file per fact, so this is a set union rather than an edit of prose.
+
+- `--dry-run` on `claude-handoff`, showing exactly what would be copied, kept
+  and flagged before anything is written.
+- `--force-memory` to replace the target's memory outright, for when that is
+  genuinely what you want.
+- A plain handoff now says when the project has memory that is being left
+  behind, rather than staying silent about it.
+
+### Fixed
+
+- `claude-profile --help` reported "invalid profile name: --help", and
+  `claude-auto --help` launched Claude instead of explaining itself. Both are
+  shell-only functions with no core subcommand behind them, so neither had ever
+  had help. All twelve commands now answer `--help`.
+
 ## [1.8.0] - 2026-09-21
 
 ### Added
@@ -291,6 +319,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.9.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.9.0
 [1.8.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.8.0
 [1.7.4]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.4
 [1.7.3]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.3

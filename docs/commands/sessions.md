@@ -91,6 +91,9 @@ claude-handoff work -d ~/projects/<project-name>/api # conversations belonging t
 | `SESSION` | optional session id or unique prefix. Omit for the latest |
 | `-s`, `--source` | profile to copy from (default: the active one) |
 | `-d`, `--dir` | directory whose conversations to consider (default: current) |
+| `-m`, `--with-memory` | also merge this project's saved memory into the target |
+| `--force-memory` | replace the target's memory instead of merging |
+| `-n`, `--dry-run` | show what would happen, change nothing |
 
 On success it prints the resume command:
 
@@ -107,6 +110,67 @@ profile onto itself, or into a profile that does not exist, is refused with a
 message rather than silently doing nothing.
 
 It is a copy - the source profile keeps its version, so you can switch back.
+
+### Carrying the project's memory across
+
+Claude Code saves memory per profile **and** per project:
+
+```
+~/.claude-profiles/<profile>/projects/<encoded-dir>/
+  <session-id>.jsonl      the conversation - this is what handoff copies
+  memory/                 saved facts about the project - a sibling, left alone
+```
+
+A plain handoff moves the conversation, not the memory. The conversation itself
+carries everything that was said, so you can keep working - but the distilled
+facts Claude normally reads at the start of a session stay behind.
+
+```sh
+claude-handoff work --with-memory
+```
+
+That merges them:
+
+| Situation | What happens |
+|---|---|
+| File only in the source | copied |
+| File only in the target | left alone |
+| Same file, identical | nothing to do |
+| Same name, different contents | **both kept** - the incoming one saved as `<name>.from-<source>.md` |
+| `MEMORY.md` | the two indexes are combined, keeping the target's order |
+
+Memory is one file per fact with a unique name, so merging is a set union
+rather than an edit of prose. Nothing is overwritten and nothing is lost.
+
+```
+handed off session a3f81c2e-…
+  from: work   to: personal
+  memory: 2 copied, 1 already there, 1 kept side by side
+```
+
+Look before you leap:
+
+```sh
+claude-handoff work --with-memory --dry-run
+```
+
+```
+dry run - nothing will be written
+would hand off a3f81c2e-…  work -> personal
+  copy     no-em-dashes.md
+  same     show-drafts.md
+  differs  api-conventions.md -> kept as api-conventions.from-work.md
+```
+
+`--force-memory` replaces the target's memory for that project outright. Rarely
+what you want, and it does discard whatever the target had learned.
+
+!!! tip "The better fix for most facts"
+    Anything true about the **project** regardless of which account you use
+    belongs in `CLAUDE.md` in the repository. Every profile reads it, it
+    survives handoffs, and it is version-controlled. Profile memory then holds
+    only the account-specific things, and losing those on a handoff is correct
+    rather than a gap.
 
 ---
 
