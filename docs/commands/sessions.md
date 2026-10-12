@@ -25,6 +25,17 @@ since it accepts prefixes.
 
 Defaults to the current directory and the active profile, newest first.
 
+A session that exists in more than one profile - because it was handed off - is
+marked, so you can see at a glance where to resume it:
+
+```
+ 1  work      0m ago   145  eb82f424 *   refactor the auth middleware…
+ 2  personal  6m ago   139  eb82f424 ·   refactor the auth middleware…
+```
+
+`*` is the copy with the most turns, which is the one you continued on. `·` is
+behind. On a tie the more recently used one wins.
+
 | Flag | Effect |
 |---|---|
 | `-a`, `--all` | every directory, not just the current one. Adds a dim `~/path (branch)` line under each row |
@@ -94,6 +105,7 @@ claude-handoff work -d ~/projects/<project-name>/api # conversations belonging t
 | `-m`, `--with-memory` | also merge this project's saved memory into the target |
 | `--force-memory` | replace the target's memory instead of merging |
 | `-n`, `--dry-run` | show what would happen, change nothing |
+| `-f`, `--force` | overwrite a target copy that is ahead or has diverged |
 
 On success it prints the resume command:
 
@@ -110,6 +122,33 @@ profile onto itself, or into a profile that does not exist, is refused with a
 message rather than silently doing nothing.
 
 It is a copy - the source profile keeps its version, so you can switch back.
+
+### When the target already has the session
+
+Handing the same session back and forth is normal: you move it to `personal`
+when `work` runs out, then back to `work` once the limit resets. So the target
+often already has a copy, and overwriting the wrong one would lose turns.
+
+What happens depends on which copy is further along:
+
+| Target copy | Result |
+|---|---|
+| Not there | copied |
+| Identical | nothing to do, says so |
+| Fewer turns | updated, reports `3 turns -> 7` |
+| **More turns** | **refused** - that copy has work the source does not |
+| Same turns, different contents | **refused** - they were continued separately |
+
+A refusal tells you both turn counts, so you can see which copy to resume:
+
+```
+work already has this session and it would be overwritten
+  work: 7 turns   personal: 4 turns  - the copy in work is further along
+  resume it there instead, or pass --force to overwrite (a .bak is kept)
+```
+
+`--force` overwrites anyway and writes the previous contents to
+`<session-id>.jsonl.bak` first, so nothing is unrecoverable.
 
 ### Carrying the project's memory across
 

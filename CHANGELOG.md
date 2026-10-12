@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-10-12
+
+### Fixed
+
+- **`claude-handoff` could silently destroy work.** It copied the transcript
+  over whatever was already in the target, with no check. Handing a session
+  from `x` to `y` and later back to `x`, after both had been continued
+  separately, overwrote the longer copy and reported success. A seven-turn
+  conversation became a four-turn one with no warning.
+
+  It now compares the two copies. A target with fewer turns is updated, an
+  identical one is left alone, and a target that is further along or has
+  diverged is **refused** with both turn counts shown. `--force` overwrites and
+  keeps the previous contents as `<session-id>.jsonl.bak`.
+
+  Every other destructive path in this tool already guarded itself. Handoff did
+  not, because it was written assuming the target never had that file.
+
+### Added
+
+- `claude-sessions` marks a session that exists in more than one profile: `*`
+  on the copy with the most turns, `·` on the ones behind. After a handoff both
+  profiles hold a copy, and nothing previously said which to resume.
+
 ## [1.9.0] - 2026-09-21
 
 ### Added
@@ -319,6 +343,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[1.10.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.10.0
 [1.9.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.9.0
 [1.8.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.8.0
 [1.7.4]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.7.4

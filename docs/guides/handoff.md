@@ -54,6 +54,20 @@ are kept** so you can decide later. Add `--dry-run` to see the plan first.
 
 [Full detail](../commands/sessions.md#carrying-the-projects-memory-across)
 
+## Handing it back
+
+Once the first account's limit resets you can hand the session back the same
+way. If both copies have moved on since, the handoff **refuses** rather than
+overwriting, and tells you which one is further along:
+
+```
+work already has this session and it would be overwritten
+  work: 7 turns   personal: 4 turns  - the copy in work is further along
+```
+
+`claude-sessions -A -a` marks the leading copy with `*` so you can see where to
+resume without counting.
+
 ## What it does not do
 
 - **Does not move anything.** It is a copy - the original account keeps its version, so you can switch back.

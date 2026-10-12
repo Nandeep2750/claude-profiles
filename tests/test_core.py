@@ -694,6 +694,87 @@ class TestHandoff(Fixture):
         self.assertIn("aaa99999", out)
 
 
+class TestHandoffOverwrite(Fixture):
+    """A session copied both ways must never silently lose turns."""
+
+    def setUp(self):
+        super().setUp()
+        self.proj = os.path.join(self.home, "code", "api")
+        os.makedirs(self.proj, exist_ok=True)
+        self.enc = encode_dir(self.proj)
+        self.sid = "ovr11111-0000-0000-0000-000000000000"
+
+    def put(self, where, msgs):
+        d = (os.path.join(self.home, ".claude", "projects", self.enc) if where == "default"
+             else os.path.join(self.ph, where, "projects", self.enc))
+        transcript(os.path.join(d, f"{self.sid}.jsonl"), self.proj, msgs)
+
+    def turns(self, where):
+        d = (os.path.join(self.home, ".claude", "projects", self.enc) if where == "default"
+             else os.path.join(self.ph, where, "projects", self.enc))
+        f = os.path.join(d, f"{self.sid}.jsonl")
+        return self.core.turn_count(f) if os.path.exists(f) else 0
+
+    def test_absent_target_is_copied(self):
+        self.put("default", ["a", "b", "c"])
+        code, _, _ = self.run_cmd("handoff", "work", "-d", self.proj)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.turns("work"), 3)
+
+    def test_identical_target_is_left_alone(self):
+        self.put("default", ["a", "b"]); self.put("work", ["a", "b"])
+        code, out, _ = self.run_cmd("handoff", "work", "-d", self.proj)
+        self.assertEqual(code, 0)
+        self.assertIn("unchanged", out)
+
+    def test_behind_target_is_updated(self):
+        self.put("default", ["a", "b", "c", "d"]); self.put("work", ["a", "b"])
+        code, out, _ = self.run_cmd("handoff", "work", "-d", self.proj)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.turns("work"), 4)
+        self.assertIn("2 turns -> 4", out)
+
+    def test_target_that_is_ahead_is_refused(self):
+        self.put("default", ["a", "b"]); self.put("work", ["a", "b", "c", "d", "e"])
+        code, _, err = self.run_cmd("handoff", "work", "-d", self.proj)
+        self.assertEqual(code, 1)
+        self.assertIn("further along", err)
+        self.assertEqual(self.turns("work"), 5, "the target must not be touched")
+
+    def test_diverged_target_is_refused(self):
+        self.put("default", ["a", "b", "X"]); self.put("work", ["a", "b", "Y"])
+        code, _, err = self.run_cmd("handoff", "work", "-d", self.proj)
+        self.assertEqual(code, 1)
+        self.assertIn("contents differ", err)
+
+    def test_force_overwrites_and_keeps_a_backup(self):
+        self.put("default", ["a", "b"]); self.put("work", ["a", "b", "c", "d", "e"])
+        code, out, _ = self.run_cmd("handoff", "work", "-d", self.proj, "--force")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.turns("work"), 2)
+        bak = os.path.join(self.ph, "work", "projects", self.enc, f"{self.sid}.jsonl.bak")
+        self.assertTrue(os.path.isfile(bak), "the overwritten copy must be recoverable")
+        self.assertIn(".bak", out)
+
+    def test_dry_run_reports_the_conflict_without_writing(self):
+        self.put("default", ["a", "b"]); self.put("work", ["a", "b", "c"])
+        code, out, err = self.run_cmd("handoff", "work", "-d", self.proj, "--dry-run")
+        self.assertEqual(code, 1, "a refusal is still a refusal in dry run")
+        self.assertEqual(self.turns("work"), 3)
+
+    def test_round_trip_without_divergence_is_fine(self):
+        self.put("default", ["a", "b"])
+        self.run_cmd("handoff", "work", "-d", self.proj)
+        self.put("work", ["a", "b", "c", "d"])            # work continues there
+        os.environ["CLAUDE_CONFIG_DIR"] = os.path.join(self.ph, "work")
+        try:
+            code, _, _ = self.run_cmd("handoff", "default", "-d", self.proj)
+        finally:
+            os.environ.pop("CLAUDE_CONFIG_DIR", None)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.turns("default"), 4)
+
+
 class TestHandoffMemory(Fixture):
     def setUp(self):
         super().setUp()

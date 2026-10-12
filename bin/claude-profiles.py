@@ -26,7 +26,7 @@ import time
 import urllib.error
 import urllib.request
 
-__version__ = "1.9.0"
+__version__ = "1.10.0"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -593,6 +593,15 @@ def cmd_sessions(a):
                 continue
             found.append((mtime, p, os.path.basename(f)[:-6], cwd or "?", branch, turns, summary))
     found.sort(reverse=True)
+
+    # a session copied between profiles exists in both; mark which copy leads so
+    # it is obvious where to resume
+    leader = {}
+    for _, p, sid, _, _, turns, _ in found:
+        if sid not in leader or turns > leader[sid][1]:
+            leader[sid] = (p, turns)
+    dupes = {sid for sid in leader
+             if sum(1 for r in found if r[2] == sid) > 1}
     if not found:
         where = "any directory" if a.all else target
         what = f"matching '{a.grep}' " if a.grep else ""
@@ -629,6 +638,10 @@ def cmd_sessions(a):
         for i, (mtime, p, sid, cwd, branch, turns, summary) in enumerate(found, 1):
             shown = sid[:8] if short_id else sid
             row = [str(i), age(mtime), str(turns), C(shown, "cy")]
+            if sid in dupes:
+                lead_p, lead_t = leader[sid]
+                row[-1] += (C(" *", "gr") if lead_p == p and lead_t == turns
+                            else C(" ·", "yl"))
             if multi:
                 row.insert(1, p)
             if a.all:
@@ -763,6 +776,38 @@ def handle_memory(a, src, dst, enc, source_name, C, D):
     return "memory: " + ", ".join(bits) if bits else D("memory already matches")
 
 
+def turn_count(path):
+    """User messages in a transcript. Cheaper than scan() and enough to compare."""
+    info = scan(path)
+    return info[2] if info else 0
+
+
+def compare_copies(src_file, dst_file):
+    """Decide whether overwriting the target copy is safe.
+
+    Returns (verdict, detail). Verdicts:
+      absent     target has no copy - plain copy
+      identical  byte for byte the same - nothing to do
+      behind     target has fewer turns - safe to update
+      ahead      target has more turns - refuse, it would lose work
+      diverged   same turn count, different content - refuse
+    """
+    if not os.path.exists(dst_file):
+        return "absent", None
+    try:
+        with open(src_file, "rb") as a, open(dst_file, "rb") as b:
+            if a.read() == b.read():
+                return "identical", None
+    except OSError:
+        pass
+    s_turns, d_turns = turn_count(src_file), turn_count(dst_file)
+    if d_turns < s_turns:
+        return "behind", (d_turns, s_turns)
+    if d_turns > s_turns:
+        return "ahead", (d_turns, s_turns)
+    return "diverged", (d_turns, s_turns)
+
+
 def cmd_handoff(a):
     src_name = a.source or active_profile()
     src = profile_dir(src_name)
@@ -806,21 +851,59 @@ def cmd_handoff(a):
     C = color()
     D = lambda t: C(t, "dim")          # noqa: E731
 
+    dst_file = os.path.join(outdir, os.path.basename(f))
+    verdict, counts = compare_copies(f, dst_file)
+
+    if verdict in ("ahead", "diverged") and not a.force:
+        d_turns, s_turns = counts
+        print(f"{a.target} already has this session and it would be overwritten",
+              file=sys.stderr)
+        if verdict == "ahead":
+            print(f"  {a.target}: {d_turns} turns   {src_name}: {s_turns} turns"
+                  f"  - the copy in {a.target} is further along", file=sys.stderr)
+        else:
+            print(f"  both have {d_turns} turns but the contents differ"
+                  " - they were continued separately", file=sys.stderr)
+        print("  resume it there instead, or pass --force to overwrite"
+              " (a .bak is kept)", file=sys.stderr)
+        return 1
+
     if a.dry_run:
         print(C("dry run - nothing will be written", "yl"))
         print(f"would hand off {C(sid, 'cy')}  {D(f'{src_name} -> {a.target}')}")
+        if verdict == "identical":
+            print(D("  the target already has an identical copy"))
+        elif verdict == "behind":
+            print(f"  {D('target is')} {counts[0]} {D('turns, this is')} {counts[1]}")
+        elif verdict in ("ahead", "diverged"):
+            was = "further along" if verdict == "ahead" else "different"
+            print(C(f"  would overwrite a copy that is {was} ({counts[0]} turns)", "rd"))
         if a.with_memory or a.force_memory:
             print(handle_memory(a, src, dst, enc, src_name, C, D))
         return 0
 
+    if verdict == "identical":
+        print(f"{a.target} already has this session, unchanged")
+        print()
+        print(f"  claude-profile {a.target} && claude --resume {sid}")
+        return 0
+
     os.makedirs(outdir, exist_ok=True)
-    shutil.copy2(f, os.path.join(outdir, os.path.basename(f)))
+    if verdict in ("ahead", "diverged"):          # only reachable with --force
+        shutil.copy2(dst_file, dst_file + ".bak")
+    shutil.copy2(f, dst_file)
 
     info = scan(f)
     print(f"handed off session {C(sid,'cy')}")
     print(f"  from: {src_name}   to: {a.target}")
     if info and info[0]:
         print(f"  dir : {info[0].replace(HOME,'~')}")
+    if verdict == "behind":
+        print(f"  {D('updated the copy in')} {a.target}{D(f': {counts[0]} turns -> {counts[1]}')}")
+    elif verdict in ("ahead", "diverged"):
+        was = "further along" if verdict == "ahead" else "different"
+        print(C(f"  overwrote a copy that was {was} ({counts[0]} turns)"
+                f" - kept as {os.path.basename(dst_file)}.bak", "yl"))
     if a.with_memory or a.force_memory:
         print("  " + handle_memory(a, src, dst, enc, src_name, C, D))
     elif os.path.isdir(os.path.join(src, "projects", enc, MEMORY_DIR)):
@@ -1602,6 +1685,8 @@ def main():
                    help="replace the target's memory instead of merging")
     p.add_argument("-n", "--dry-run", action="store_true",
                    help="show what would happen, change nothing")
+    p.add_argument("-f", "--force", action="store_true",
+                   help="overwrite a target copy that is ahead or has diverged")
     p.set_defaults(fn=cmd_handoff)
 
     a = ap.parse_args()
