@@ -52,6 +52,18 @@ the shell functions launch the Python core fresh on every call. Changes under
 reloaded. `claude-update` tells you which kind you just got, so you only restart
 when it is actually necessary.
 
+## Changes that need your attention
+
+Most updates only add things. A few change what an existing command does, and
+those are listed here so they do not surprise you.
+
+| Version | Change | To keep the old behaviour |
+|---|---|---|
+| 2.0.0 | `claude-handoff` **moves** a session instead of copying it. The source is renamed to `<session-id>.jsonl.bak`. | `--copy` per command, or `CLAUDE_HANDOFF_COPY=1` |
+
+The [changelog](https://github.com/Nandeep2750/claude-profiles/blob/main/CHANGELOG.md)
+marks every breaking change with a major version bump.
+
 ## Reloading your shell
 
 When `claude-update` says the shell layer changed, reload any terminal you

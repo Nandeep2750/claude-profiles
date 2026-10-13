@@ -155,7 +155,7 @@ complete -F _claude_profile_complete claude-profile
 complete -F _claude_profile_complete claude-profile-remove
 complete -F _claude_profile_complete claude-profile-exec
 complete -F _claude_profile_complete claude-profile-clone
-complete -W "-m --with-memory --force-memory -n --dry-run -f --force -s --source -d --dir" claude-handoff
+complete -W "-m --with-memory --force-memory -n --dry-run -f --force --move --copy -s --source -d --dir" claude-handoff
 complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir --plain -g --grep" claude-sessions
 complete -W "-o --older-than -p --profile -n --limit -y --yes --plain" claude-prune
 complete -W "-c --check" claude-update

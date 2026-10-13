@@ -122,10 +122,20 @@ conversation, it genuinely cannot see the file.
 
 ```
 ~/.claude/projects/<encoded-dir>/<session-id>.jsonl
-        |  copy, preserving the encoded directory name
+        |  1. copy, preserving the encoded directory name
         v
 ~/.claude-profiles/work/projects/<encoded-dir>/<session-id>.jsonl
+
+~/.claude/projects/<encoded-dir>/<session-id>.jsonl
+        |  2. rename, only once the copy is verified byte for byte
+        v
+~/.claude/projects/<encoded-dir>/<session-id>.jsonl.bak
 ```
+
+The second step is what makes it a move. It is a rename, not a delete, and
+`claude --resume` and `claude-sessions` only look at `*.jsonl`, so the `.bak` is
+invisible to both. One live copy exists, and undoing the move is renaming the
+file back. `--copy` skips step 2.
 
 Only the profile root changes. The encoded directory segment is identical, and
 the file is byte-for-byte the same, so every `cwd` inside it still points at the

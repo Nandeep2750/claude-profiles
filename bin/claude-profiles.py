@@ -26,7 +26,7 @@ import time
 import urllib.error
 import urllib.request
 
-__version__ = "1.10.0"
+__version__ = "2.0.0"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -808,6 +808,25 @@ def compare_copies(src_file, dst_file):
     return "diverged", (d_turns, s_turns)
 
 
+def retire_source(src_file):
+    """Move the source transcript aside so it is no longer resumable there.
+
+    Renamed rather than deleted: a handoff that went somewhere unexpected is
+    then a rename away from undone. transcripts() only matches *.jsonl, so the
+    .bak is invisible to listings and to `claude --resume`.
+    """
+    bak = src_file + ".bak"
+    os.replace(src_file, bak)
+    return os.path.basename(bak)
+
+
+def handoff_moves(a):
+    """--move / --copy win; otherwise CLAUDE_HANDOFF_COPY=1 selects copy."""
+    if a.move is not None:
+        return a.move
+    return os.environ.get("CLAUDE_HANDOFF_COPY", "") not in ("1", "true", "yes")
+
+
 def cmd_handoff(a):
     src_name = a.source or active_profile()
     src = profile_dir(src_name)
@@ -870,7 +889,10 @@ def cmd_handoff(a):
 
     if a.dry_run:
         print(C("dry run - nothing will be written", "yl"))
-        print(f"would hand off {C(sid, 'cy')}  {D(f'{src_name} -> {a.target}')}")
+        verb = "move" if handoff_moves(a) else "copy"
+        print(f"would {verb} {C(sid, 'cy')}  {D(f'{src_name} -> {a.target}')}")
+        if verb == "move":
+            print(D(f"  {src_name}'s copy would be kept as {sid}.jsonl.bak"))
         if verdict == "identical":
             print(D("  the target already has an identical copy"))
         elif verdict == "behind":
@@ -884,6 +906,9 @@ def cmd_handoff(a):
 
     if verdict == "identical":
         print(f"{a.target} already has this session, unchanged")
+        if handoff_moves(a):
+            bak = retire_source(f)
+            print(D(f"  {src_name}'s copy retired as {bak}"))
         print()
         print(f"  claude-profile {a.target} && claude --resume {sid}")
         return 0
@@ -893,11 +918,23 @@ def cmd_handoff(a):
         shutil.copy2(dst_file, dst_file + ".bak")
     shutil.copy2(f, dst_file)
 
-    info = scan(f)
-    print(f"handed off session {C(sid,'cy')}")
+    retired = None
+    if handoff_moves(a):
+        with open(f, "rb") as x, open(dst_file, "rb") as y:
+            landed = x.read() == y.read()
+        if not landed:
+            print(f"copy to {a.target} did not verify - {src_name}'s copy left in place",
+                  file=sys.stderr)
+            return 1
+        retired = retire_source(f)
+
+    info = scan(f) if os.path.exists(f) else scan(dst_file)
+    print(f"{'moved' if retired else 'handed off'} session {C(sid,'cy')}")
     print(f"  from: {src_name}   to: {a.target}")
     if info and info[0]:
         print(f"  dir : {info[0].replace(HOME,'~')}")
+    if retired:
+        print(D(f"  {src_name}'s copy retired as {retired} - undo by renaming it back"))
     if verdict == "behind":
         print(f"  {D('updated the copy in')} {a.target}{D(f': {counts[0]} turns -> {counts[1]}')}")
     elif verdict in ("ahead", "diverged"):
@@ -1687,6 +1724,11 @@ def main():
                    help="show what would happen, change nothing")
     p.add_argument("-f", "--force", action="store_true",
                    help="overwrite a target copy that is ahead or has diverged")
+    grp = p.add_mutually_exclusive_group()
+    grp.add_argument("--move", dest="move", action="store_true", default=None,
+                     help="retire the source copy after handing off (the default)")
+    grp.add_argument("--copy", dest="move", action="store_false",
+                     help="leave the source copy in place")
     p.set_defaults(fn=cmd_handoff)
 
     a = ap.parse_args()

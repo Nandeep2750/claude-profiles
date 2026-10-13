@@ -116,7 +116,7 @@ see [How it works](internals/index.md) for the details.
 | `claude-profiles` | List every profile and which account is signed into it |
 | `claude-profile NAME` | Switch to `NAME`, creating it if needed |
 | `claude-sessions` | List this directory's conversations, readably |
-| `claude-handoff NAME` | Copy this directory's latest conversation to profile `NAME` |
+| `claude-handoff NAME` | Move this directory's latest conversation to profile `NAME` |
 | `claude-profile-remove NAME` | Delete a profile, its conversations and its credentials |
 | `claude-profile-exec NAME CMD` | Run one command under a profile without switching |
 | `claude-profile-clone SRC DST` | Seed a profile's settings from another one |

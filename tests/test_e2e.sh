@@ -85,9 +85,15 @@ expect "--force overwrites"               'claude-profile-clone alpha beta --for
 
 echo "-- handoff --"
 _run 'mkdir -p "$HOME/.claude/projects/-tmp-proj"; printf "{\"type\":\"user\",\"cwd\":\"/tmp/proj\",\"message\":{\"content\":\"hello\"}}\n" > "$HOME/.claude/projects/-tmp-proj/aaa11111-0000-0000-0000-000000000000.jsonl"' >/dev/null
-expect "copies a session"                 'claude-handoff alpha aaa11111 -d /tmp/proj'      "handed off"
+expect "--copy hands a session over"      'claude-handoff alpha aaa11111 -d /tmp/proj --copy' "handed off"
 check  "  landed in the target"           '[ -n "$(find "$CLAUDE_PROFILE_HOME/alpha/projects" -name "aaa11111*" 2>/dev/null)" ]'
-check  "  original survives"              '[ -f "$HOME/.claude/projects/-tmp-proj/aaa11111-0000-0000-0000-000000000000.jsonl" ]'
+check  "  original survives a copy"       '[ -f "$HOME/.claude/projects/-tmp-proj/aaa11111-0000-0000-0000-000000000000.jsonl" ]'
+_run 'printf "{\"type\":\"user\",\"cwd\":\"/tmp/proj\",\"message\":{\"content\":\"second\"}}\n" > "$HOME/.claude/projects/-tmp-proj/bbb22222-0000-0000-0000-000000000000.jsonl"' >/dev/null
+expect "the default moves it"             'claude-handoff alpha bbb22222 -d /tmp/proj'      "moved session"
+check  "  landed in the target"           '[ -n "$(find "$CLAUDE_PROFILE_HOME/alpha/projects" -name "bbb22222*.jsonl" 2>/dev/null)" ]'
+check  "  source is no longer resumable"  '[ ! -f "$HOME/.claude/projects/-tmp-proj/bbb22222-0000-0000-0000-000000000000.jsonl" ]'
+check  "  source kept as a .bak"          '[ -f "$HOME/.claude/projects/-tmp-proj/bbb22222-0000-0000-0000-000000000000.jsonl.bak" ]'
+expect "CLAUDE_HANDOFF_COPY switches the default" 'export CLAUDE_HANDOFF_COPY=1; claude-handoff alpha aaa11111 -d /tmp/proj' "unchanged"
 expect "refuses an unknown target"        'claude-handoff nosuch -d /tmp/proj 2>&1'         "no such profile"
 expect "refuses a traversal target"       'claude-handoff ../escape -d /tmp/proj 2>&1'      "invalid profile name"
 

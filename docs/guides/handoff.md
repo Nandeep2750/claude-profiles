@@ -1,6 +1,6 @@
 # Session handoff
 
-**What it does, simply:** it copies a conversation from one account to another,
+**What it does, simply:** it moves a conversation from one account to another,
 so you can keep going when the first account runs out.
 
 ## The problem
@@ -18,13 +18,14 @@ from there - each account keeps its own separate history.
 claude-handoff work
 ```
 
-That copies the current conversation into the `work` account's history and
+That moves the current conversation into the `work` account's history and
 prints the command to continue it:
 
 ```
-handed off session 0a9014e8-8806-43cf-98fd-28fad1353923
+moved session 0a9014e8-8806-43cf-98fd-28fad1353923
   from: default   to: work
   dir : ~/projects/<project-name>/api
+  default's copy retired as 0a9014e8-8806-43cf-98fd-28fad1353923.jsonl.bak - undo by renaming it back
 
   claude-profile work && claude --resume 0a9014e8-8806-43cf-98fd-28fad1353923
 ```
@@ -57,8 +58,9 @@ are kept** so you can decide later. Add `--dry-run` to see the plan first.
 ## Handing it back
 
 Once the first account's limit resets you can hand the session back the same
-way. If both copies have moved on since, the handoff **refuses** rather than
-overwriting, and tells you which one is further along:
+way. Normally the original is a `.bak` by then and the move just works. If you
+used `--copy` and both sides have moved on since, the handoff **refuses** rather
+than overwriting, and tells you which one is further along:
 
 ```
 work already has this session and it would be overwritten
@@ -70,7 +72,7 @@ resume without counting.
 
 ## What it does not do
 
-- **Does not move anything.** It is a copy - the original account keeps its version, so you can switch back.
+- **Does not lose anything.** The original is renamed to `<session-id>.jsonl.bak`, not deleted, so a handoff that went somewhere unexpected is one rename from undone.
 - **Does not touch your code.** Same project folder, same files, same git branch.
 - **Does not transfer your limit.** That is the point: the other account has its own quota.
 
@@ -112,14 +114,22 @@ claude-handoff work 2c24a68b
 
 An ambiguous prefix lists the candidates rather than guessing.
 
-## What actually gets copied
+## What actually moves
 
 ```
 ~/.claude/projects/<encoded-dir>/<session-id>.jsonl
-        |  copy, preserving the encoded directory name
+        |  copied, preserving the encoded directory name
         v
 ~/.claude-profiles/work/projects/<encoded-dir>/<session-id>.jsonl
+
+~/.claude/projects/<encoded-dir>/<session-id>.jsonl
+        |  then renamed, once the copy is verified byte for byte
+        v
+~/.claude/projects/<encoded-dir>/<session-id>.jsonl.bak
 ```
+
+The source is only touched after the target is confirmed identical. If the copy
+does not verify, the source is left exactly as it was.
 
 Only the profile root changes. The file is byte-for-byte identical, so every
 working directory recorded inside it still points at the original project.
@@ -138,5 +148,25 @@ conversation, it genuinely cannot see the file.
 claude-handoff default
 ```
 
-Works in either direction. Both copies persist independently from the moment
-they diverge.
+Works in either direction, and it is the same operation: the conversation moves
+back, and the copy in the profile you left becomes a `.bak`.
+
+## Keeping both copies
+
+Sometimes you want the original left in place - to try something on another
+account without committing to it, say.
+
+```sh
+claude-handoff work --copy
+```
+
+Both profiles then hold the session and continue independently from that point.
+`claude-sessions -A -a` marks the one with the most turns with `*`.
+
+To make that your default:
+
+```sh
+export CLAUDE_HANDOFF_COPY=1     # before the source line in your rc file
+```
+
+`--move` overrides it for a single command.

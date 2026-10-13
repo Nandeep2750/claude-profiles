@@ -651,8 +651,8 @@ class TestHandoff(Fixture):
     def dest(self, sid):
         return os.path.join(self.ph, "work", "projects", self.enc, sid + ".jsonl")
 
-    def test_copies_the_transcript_and_keeps_the_original(self):
-        code, out, _ = self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+    def test_copy_keeps_the_original(self):
+        code, out, _ = self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj, "--copy")
         self.assertEqual(code, 0)
         self.assertTrue(os.path.isfile(self.dest("aaa11111-0000-0000-0000-000000000000")))
         self.assertTrue(os.path.isfile(os.path.join(
@@ -664,11 +664,84 @@ class TestHandoff(Fixture):
         self.assertTrue(os.path.isdir(os.path.join(self.ph, "work", "projects", self.enc)))
 
     def test_copy_is_byte_identical(self):
-        self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj, "--copy")
         src = os.path.join(self.home, ".claude", "projects", self.enc,
                            "aaa11111-0000-0000-0000-000000000000.jsonl")
         with open(src, "rb") as a, open(self.dest("aaa11111-0000-0000-0000-000000000000"), "rb") as b:
             self.assertEqual(a.read(), b.read())
+
+    # ---- move is the default ------------------------------------------------
+    def src_file(self, name="aaa11111-0000-0000-0000-000000000000.jsonl"):
+        return os.path.join(self.home, ".claude", "projects", self.enc, name)
+
+    def test_default_moves_the_session(self):
+        code, out, _ = self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        self.assertEqual(code, 0)
+        self.assertTrue(os.path.isfile(self.dest("aaa11111-0000-0000-0000-000000000000")))
+        self.assertFalse(os.path.exists(self.src_file()), "source must no longer be resumable")
+        self.assertIn("moved session", out)
+
+    def test_move_keeps_the_source_as_a_bak(self):
+        self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        bak = self.src_file("aaa11111-0000-0000-0000-000000000000.jsonl.bak")
+        self.assertTrue(os.path.isfile(bak), "a move must be undoable")
+        with open(bak, "rb") as a, open(self.dest("aaa11111-0000-0000-0000-000000000000"), "rb") as b:
+            self.assertEqual(a.read(), b.read())
+
+    def test_a_retired_session_is_gone_from_listings(self):
+        self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        # the other fixture session aaa99999 is still there; only aaa11111 left
+        _, out, _ = self.run_cmd("sessions", "-p", "default", "-d", self.proj, "--plain")
+        self.assertNotIn("aaa11111", out)
+        self.assertIn("aaa99999", out)
+        _, out, _ = self.run_cmd("sessions", "-p", "work", "-d", self.proj, "--plain")
+        self.assertIn("aaa11111", out)
+
+    def test_explicit_move_flag(self):
+        self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj, "--move")
+        self.assertFalse(os.path.exists(self.src_file()))
+
+    def test_move_and_copy_conflict(self):
+        code, _, err = self.run_cmd("handoff", "work", "-d", self.proj, "--move", "--copy")
+        self.assertEqual(code, 2)
+
+    def test_env_var_makes_copy_the_default(self):
+        os.environ["CLAUDE_HANDOFF_COPY"] = "1"
+        try:
+            self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        finally:
+            os.environ.pop("CLAUDE_HANDOFF_COPY", None)
+        self.assertTrue(os.path.exists(self.src_file()))
+
+    def test_move_flag_beats_the_env_var(self):
+        os.environ["CLAUDE_HANDOFF_COPY"] = "1"
+        try:
+            self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj, "--move")
+        finally:
+            os.environ.pop("CLAUDE_HANDOFF_COPY", None)
+        self.assertFalse(os.path.exists(self.src_file()))
+
+    def test_a_refused_move_leaves_the_source_alone(self):
+        # target is further along - the guard refuses, and nothing may be retired
+        transcript(os.path.join(self.ph, "work", "projects", self.enc,
+                                "aaa11111-0000-0000-0000-000000000000.jsonl"),
+                   self.proj, ["a", "b", "c", "d", "e", "f"])
+        code, _, _ = self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        self.assertEqual(code, 1)
+        self.assertTrue(os.path.exists(self.src_file()), "refusal must not retire the source")
+
+    def test_dry_run_move_retires_nothing(self):
+        code, out, _ = self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj, "--dry-run")
+        self.assertEqual(code, 0)
+        self.assertIn("would move", out)
+        self.assertTrue(os.path.exists(self.src_file()))
+        self.assertFalse(os.path.exists(self.dest("aaa11111-0000-0000-0000-000000000000")))
+
+    def test_move_with_an_identical_target_still_retires_the_source(self):
+        self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj, "--copy")
+        self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        self.assertFalse(os.path.exists(self.src_file()))
+        self.assertTrue(os.path.isfile(self.dest("aaa11111-0000-0000-0000-000000000000")))
 
     def test_ambiguous_prefix_is_refused(self):
         code, _, err = self.run_cmd("handoff", "work", "aaa", "-d", self.proj)

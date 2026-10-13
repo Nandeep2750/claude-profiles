@@ -150,6 +150,20 @@ Choose what it shows with `--show`; the segments are listed in the
 [command reference](commands/statusline.md#claude-profiles-statusline). Settings are
 per-profile, which is why `--install-all` exists.
 
+## `CLAUDE_HANDOFF_COPY`
+
+Make `claude-handoff` copy instead of move. By default a handoff moves: the
+source transcript is renamed to `<session-id>.jsonl.bak` once the target is
+verified identical.
+
+```sh
+export CLAUDE_HANDOFF_COPY=1
+source "$HOME/.claude-tools/shell/claude-profiles.zsh"
+```
+
+`--move` and `--copy` on the command line override it. See
+[Move or copy](commands/sessions.md#move-or-copy).
+
 ## `CLAUDE_PROFILE_HOME`
 
 Where account data lives. Defaults to `~/.claude-profiles`. Set it before

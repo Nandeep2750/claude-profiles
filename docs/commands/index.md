@@ -64,7 +64,7 @@ same way on macOS, Linux, WSL and Windows.
 | [`claude-profiles --live`](usage.md#live-figures) | The same, with current figures instead of the cache |
 | [`claude-sessions`](sessions.md#claude-sessions-options) | List conversations readably |
 | [`claude-sessions --grep`](sessions.md#searching-your-conversations) | Search every message across every account |
-| [`claude-handoff NAME`](sessions.md#claude-handoff-target-session) | Copy a conversation to another account and continue there |
+| [`claude-handoff NAME`](sessions.md#claude-handoff-target-session) | Move a conversation to another account and continue there |
 | [`claude-best`](usage.md#claude-best) | Which account has the most headroom |
 | [`claude-auto`](usage.md#claude-auto) | Launch Claude on that account automatically |
 | [`claude-profile-exec`](manage.md#claude-profile-exec-profile-command-args) | Run one command under a profile without switching |

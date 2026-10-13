@@ -50,8 +50,18 @@ Three things to check, in order:
 1. **Are you in the right directory?** Sessions are looked up by working
    directory. `cd` to the folder the conversation belongs to.
 2. **Are you on the right profile?** `claude-profile` reports the active one.
-3. **Did the copy land?** `claude-sessions -A -a` shows every session in every
+3. **Did it land?** `claude-sessions -A -a` shows every session in every
    profile - find the id and confirm which profile now holds it.
+
+A handoff **moves** the session, so it is no longer resumable on the profile it
+came from. If you wanted it back there, hand it back, or rename the old copy:
+
+```sh
+cd ~/.claude/projects/<encoded-dir>
+mv <session-id>.jsonl.bak <session-id>.jsonl
+```
+
+Use `--copy` next time to leave the original in place.
 
 ## `no session found for <dir>`
 

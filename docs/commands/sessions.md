@@ -106,22 +106,47 @@ claude-handoff work -d ~/projects/<project-name>/api # conversations belonging t
 | `--force-memory` | replace the target's memory instead of merging |
 | `-n`, `--dry-run` | show what would happen, change nothing |
 | `-f`, `--force` | overwrite a target copy that is ahead or has diverged |
+| `--move` | retire the source copy after handing off (the default) |
+| `--copy` | leave the source copy in place |
 
 On success it prints the resume command:
 
 ```
-handed off session 0a9014e8-8806-43cf-98fd-28fad1353923
+moved session 0a9014e8-8806-43cf-98fd-28fad1353923
   from: default   to: work
   dir : ~/projects/<project-name>/api
+  default's copy retired as 0a9014e8-8806-43cf-98fd-28fad1353923.jsonl.bak - undo by renaming it back
 
   claude-profile work && claude --resume 0a9014e8-8806-43cf-98fd-28fad1353923
 ```
 
-**Guards.** An ambiguous prefix lists the matches instead of guessing. Copying a
-profile onto itself, or into a profile that does not exist, is refused with a
+**Guards.** An ambiguous prefix lists the matches instead of guessing. Handing
+off to the same profile, or to one that does not exist, is refused with a
 message rather than silently doing nothing.
 
-It is a copy - the source profile keeps its version, so you can switch back.
+### Move or copy
+
+By default handoff **moves** the session. The transcript is copied, the copy is
+verified byte for byte, and only then is the source renamed to
+`<session-id>.jsonl.bak`. A renamed file is invisible to `claude-sessions` and
+to `claude --resume`, so there is one live copy and no question of which to
+resume - and undoing a move is a rename.
+
+| | `--move` (default) | `--copy` |
+|---|---|---|
+| Target | gets the session | gets the session |
+| Source | renamed to `.bak` | left in place |
+| Where to resume | the target, unambiguously | either - `claude-sessions` marks the leader |
+| If the copy fails to verify | source untouched | source untouched |
+
+Reach for `--copy` to try something on another account without committing to it.
+Set `CLAUDE_HANDOFF_COPY=1` to make it your default; `--move` overrides that for
+one command.
+
+!!! note "Existing installs"
+    Before 2.0.0 handoff only ever copied. Running `claude-update` changes the
+    default to move. Pass `--copy` or set `CLAUDE_HANDOFF_COPY=1` to keep the
+    old behaviour.
 
 ### When the target already has the session
 
@@ -156,7 +181,7 @@ Claude Code saves memory per profile **and** per project:
 
 ```
 ~/.claude-profiles/<profile>/projects/<encoded-dir>/
-  <session-id>.jsonl      the conversation - this is what handoff copies
+  <session-id>.jsonl      the conversation - this is what handoff moves
   memory/                 saved facts about the project - a sibling, left alone
 ```
 
@@ -182,7 +207,7 @@ Memory is one file per fact with a unique name, so merging is a set union
 rather than an edit of prose. Nothing is overwritten and nothing is lost.
 
 ```
-handed off session a3f81c2e-…
+moved session a3f81c2e-…
   from: work   to: personal
   memory: 2 copied, 1 already there, 1 kept side by side
 ```

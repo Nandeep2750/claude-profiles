@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-10-13
+
+### Changed - breaking
+
+- **`claude-handoff` now moves the session instead of copying it.** The
+  transcript is copied to the target, the copy is verified byte for byte, and
+  only then is the source renamed to `<session-id>.jsonl.bak`. The `.bak` is
+  invisible to `claude-sessions` and `claude --resume`, so a session lives in
+  exactly one profile and there is no question of which copy to resume. Undoing
+  a move is renaming the `.bak` back.
+
+  Previously handing off left a live copy in both profiles, which meant you had
+  to work out afterwards which one had the later work.
+
+  **If you want the old behaviour**, pass `--copy`, or set
+  `CLAUDE_HANDOFF_COPY=1` to make it your default. `--move` overrides the
+  variable for a single command.
+
+  The safety properties are unchanged: a copy that fails to verify leaves the
+  source untouched, and the overwrite guard still refuses a target that is ahead
+  or has diverged - a refused move retires nothing.
+
+### Added
+
+- `--move`, `--copy` on `claude-handoff`, and `CLAUDE_HANDOFF_COPY`.
+- The output says `moved session` and names the `.bak`, so it is clear what
+  happened to the source.
+- `--dry-run` reports `would move` and which `.bak` it would leave.
+
 ## [1.10.0] - 2026-10-12
 
 ### Fixed
@@ -343,6 +372,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[2.0.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v2.0.0
 [1.10.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.10.0
 [1.9.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.9.0
 [1.8.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.8.0

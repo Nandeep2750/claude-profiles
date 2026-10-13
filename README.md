@@ -91,7 +91,7 @@ cached value rather than breaking the table.
 | `claude-profiles` | List every profile and which account is signed into it |
 | `claude-profile NAME` | Switch to `NAME`, creating it if needed |
 | `claude-sessions` | List this directory's conversations, readably |
-| `claude-handoff NAME` | Copy this directory's latest conversation to another account |
+| `claude-handoff NAME` | Move this directory's latest conversation to another account |
 | `claude-profile-remove NAME` | Delete a profile, its conversations and its credentials |
 | `claude-profile-exec NAME CMD` | Run one command under a profile without switching |
 | `claude-profile-clone SRC DST` | Seed a profile's settings from another one |
@@ -134,12 +134,13 @@ you hit your usage limit — but your other account has capacity.
 claude-handoff work
 ```
 
-That copies the conversation into the other account's history and prints the
+That moves the conversation into the other account's history and prints the
 command to continue it. Same conversation, same memory, different account
 paying. Like forwarding an email thread to your other address.
 
-It is a copy, so the original account keeps its version. Your code, folder and
-git branch are untouched.
+The original is renamed to `.bak` rather than deleted, so a move is undone by
+renaming it back; `--copy` leaves it in place. Your code, folder and git branch
+are untouched.
 [More →](https://nandeep2750.github.io/claude-profiles/guides/handoff/)
 
 ## How it works

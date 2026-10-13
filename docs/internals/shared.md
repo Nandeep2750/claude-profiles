@@ -37,7 +37,7 @@ $ claude-profiles
 
 That last row is exactly why [session handoff](../guides/handoff.md) exists. The
 other account is not hiding your conversation - it genuinely cannot see the
-file, so handoff physically copies it.
+file, so handoff physically moves it.
 
 ### Memory is per profile too
 
