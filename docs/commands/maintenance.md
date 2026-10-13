@@ -27,6 +27,9 @@ keychain
   ok   Claude Code-credentials
   FAIL Claude Code-credentials-1a2b3c4d is orphaned - no profile maps to it
 
+stranded session files
+  ok   every session's side files sit with its transcript
+
 project markers
   ok   ~/projects/<project-name>/.claude-profile -> work
 
@@ -41,6 +44,7 @@ What it checks:
 | shell wiring | exactly one `source` line per rc file, pointing at a file that exists |
 | profiles | which are signed in; `.credentials.json` not readable by other users |
 | keychain | macOS entries that no longer map to any profile - left behind by deleting a profile with `rm -rf` |
+| stranded session files | a `<session-id>/` directory of tool results and subagent logs whose transcript is no longer in that profile - left behind by a handoff made before 2.1.0 |
 | project markers | `.claude-profile` files that are empty or name a profile that does not exist |
 
 Exits non-zero if it finds problems, so it works in a script. Warnings alone

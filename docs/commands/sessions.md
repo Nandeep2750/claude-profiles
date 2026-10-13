@@ -115,6 +115,7 @@ On success it prints the resume command:
 moved session 0a9014e8-8806-43cf-98fd-28fad1353923
   from: default   to: work
   dir : ~/projects/<project-name>/api
+  side files: 24 copied
   default's copy retired as 0a9014e8-8806-43cf-98fd-28fad1353923.jsonl.bak - undo by renaming it back
 
   claude-profile work && claude --resume 0a9014e8-8806-43cf-98fd-28fad1353923
@@ -135,7 +136,7 @@ resume - and undoing a move is a rename.
 | | `--move` (default) | `--copy` |
 |---|---|---|
 | Target | gets the session | gets the session |
-| Source | renamed to `.bak` | left in place |
+| Source | transcript renamed to `.bak`, side files removed | left in place |
 | Where to resume | the target, unambiguously | either - `claude-sessions` marks the leader |
 | If the copy fails to verify | source untouched | source untouched |
 
@@ -175,13 +176,65 @@ work already has this session and it would be overwritten
 `--force` overwrites anyway and writes the previous contents to
 `<session-id>.jsonl.bak` first, so nothing is unrecoverable.
 
+### The session's own side files
+
+A long conversation is not only its transcript. Claude Code spills big tool
+results, subagent transcripts and workflow journals into a directory named
+after the session, next to it:
+
+```
+~/.claude-profiles/<profile>/projects/<encoded-dir>/
+  <session-id>.jsonl      the conversation
+  <session-id>/           its side files - tool results, subagents, workflows
+  memory/                 facts about the project, shared by every session here
+```
+
+Those side files belong to that one session, so handoff takes them along
+without being asked. There is no flag. Memory is different - it is shared by
+every session in the project, so moving it is your decision and needs
+`--with-memory`.
+
+```
+moved session 0a9014e8-…
+  from: default   to: work
+  side files: 24 copied
+```
+
+Merging follows the same no-overwrite rule as memory:
+
+| Situation | What happens |
+|---|---|
+| File only in the source | copied |
+| File only in the target | left alone |
+| Same file, identical | nothing to do |
+| Same name, different contents | **the target's is kept**, and a move leaves the source directory in place |
+
+That last row is the safe default: rather than pick a winner, the command keeps
+both sides and says so.
+
+```
+moved session 0a9014e8-…
+  side files: 23 copied, 1 kept the target's
+  default's side files stayed - some of them differ in the target
+```
+
+A `--copy` handoff copies the side files and leaves the originals alone, same as
+it does with the transcript.
+
+!!! note "Upgrading from 2.0"
+    Handoffs made before 2.1.0 left the side directory behind in the source
+    profile. A resumed session still works - Claude Code refetches what it
+    needs - but old tool results and subagent transcripts stay in the old
+    account. `claude-profiles doctor` reports any that are stranded.
+
 ### Carrying the project's memory across
 
 Claude Code saves memory per profile **and** per project:
 
 ```
 ~/.claude-profiles/<profile>/projects/<encoded-dir>/
-  <session-id>.jsonl      the conversation - this is what handoff moves
+  <session-id>.jsonl      the conversation - moved
+  <session-id>/           the session's side files - moved
   memory/                 saved facts about the project - a sibling, left alone
 ```
 

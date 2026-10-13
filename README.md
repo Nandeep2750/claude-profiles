@@ -138,9 +138,10 @@ That moves the conversation into the other account's history and prints the
 command to continue it. Same conversation, same memory, different account
 paying. Like forwarding an email thread to your other address.
 
-The original is renamed to `.bak` rather than deleted, so a move is undone by
-renaming it back; `--copy` leaves it in place. Your code, folder and git branch
-are untouched.
+The whole session travels, including the tool results and subagent transcripts
+Claude Code keeps in a directory beside the conversation. The original is
+renamed to `.bak` rather than deleted, so a move is undone by renaming it back;
+`--copy` leaves it in place. Your code, folder and git branch are untouched.
 [More →](https://nandeep2750.github.io/claude-profiles/guides/handoff/)
 
 ## How it works

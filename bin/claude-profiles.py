@@ -26,7 +26,7 @@ import time
 import urllib.error
 import urllib.request
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -782,6 +782,89 @@ def turn_count(path):
     return info[2] if info else 0
 
 
+def same_bytes(a, b):
+    """Compare two files without holding either one in memory."""
+    with open(a, "rb") as x, open(b, "rb") as y:
+        while True:
+            ca, cb = x.read(1 << 16), y.read(1 << 16)
+            if ca != cb:
+                return False
+            if not ca:
+                return True
+
+
+def side_files(d):
+    """Relative path -> full path for every file under a session's side dir."""
+    out = {}
+    for base, _, names in os.walk(d):
+        for n in names:
+            full = os.path.join(base, n)
+            out[os.path.relpath(full, d)] = full
+    return out
+
+
+def plan_side_merge(src_dir, dst_dir):
+    """Split a session's side files into new, already-there and differing."""
+    src = side_files(src_dir)
+    dst = side_files(dst_dir) if os.path.isdir(dst_dir) else {}
+    new, same, differ = [], [], []
+    for rel in sorted(src):
+        if rel not in dst:
+            new.append(rel)
+        elif same_bytes(src[rel], dst[rel]):
+            same.append(rel)
+        else:
+            differ.append(rel)
+    return new, same, differ
+
+
+def handle_side_files(a, src, dst, enc, sid, source_name, C, D):
+    """Bring the session's own side files along with its transcript.
+
+    Claude Code spills large tool results, subagent transcripts and workflow
+    journals into <profile>/projects/<enc>/<sid>/. They belong to this one
+    session, so a handoff takes them without being asked - unlike memory,
+    which is shared by every session in the project.
+
+    Returns (line, clean). clean is False when a file was left behind, so a
+    move keeps the source directory instead of removing it.
+    """
+    src_dir = os.path.join(src, "projects", enc, sid)
+    if not os.path.isdir(src_dir):
+        return None, True
+    dst_dir = os.path.join(dst, "projects", enc, sid)
+    new, same, differ = plan_side_merge(src_dir, dst_dir)
+
+    if a.dry_run:
+        bits = []
+        if new:
+            bits.append(f"{len(new)} to copy")
+        if same:
+            bits.append(f"{len(same)} already there")
+        if differ:
+            bits.append(C(f"{len(differ)} differ - the target's are kept", "yl"))
+        return D("side files: ") + ", ".join(bits or ["nothing to do"]), not differ
+
+    copied = 0
+    for rel in new:
+        target = os.path.join(dst_dir, rel)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copy2(os.path.join(src_dir, rel), target)
+        if same_bytes(os.path.join(src_dir, rel), target):
+            copied += 1
+        else:
+            differ.append(rel)
+
+    bits = []
+    if copied:
+        bits.append(f"{copied} copied")
+    if same:
+        bits.append(f"{len(same)} already there")
+    if differ:
+        bits.append(C(f"{len(differ)} kept the target's", "yl"))
+    return D("side files: ") + ", ".join(bits or ["nothing to do"]), not differ
+
+
 def compare_copies(src_file, dst_file):
     """Decide whether overwriting the target copy is safe.
 
@@ -795,9 +878,8 @@ def compare_copies(src_file, dst_file):
     if not os.path.exists(dst_file):
         return "absent", None
     try:
-        with open(src_file, "rb") as a, open(dst_file, "rb") as b:
-            if a.read() == b.read():
-                return "identical", None
+        if same_bytes(src_file, dst_file):
+            return "identical", None
     except OSError:
         pass
     s_turns, d_turns = turn_count(src_file), turn_count(dst_file)
@@ -818,6 +900,42 @@ def retire_source(src_file):
     bak = src_file + ".bak"
     os.replace(src_file, bak)
     return os.path.basename(bak)
+
+
+SID_DIR = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+def stranded_side_dirs(pname):
+    """Side-file directories whose transcript is no longer in this profile.
+
+    Left over from a handoff made before 2.1.0, which moved the transcript and
+    forgot the directory beside it. Returns [(path, session id, bytes)].
+    """
+    root = os.path.join(profile_dir(pname), "projects")
+    out = []
+    for proj in sorted(os.listdir(root) if os.path.isdir(root) else []):
+        pdir = os.path.join(root, proj)
+        if not os.path.isdir(pdir):
+            continue
+        names = sorted(os.listdir(pdir))
+        live = {n[:-6] for n in names if n.endswith(".jsonl")}
+        for sid in names:
+            d = os.path.join(pdir, sid)
+            if SID_DIR.match(sid) and sid not in live and os.path.isdir(d):
+                out.append((d, sid, dir_size(d)))
+    return out
+
+
+def retire_side(src, enc, sid, clean, source_name, C):
+    """Drop the source side files after a move, or say why they stayed."""
+    src_dir = os.path.join(src, "projects", enc, sid)
+    if not os.path.isdir(src_dir):
+        return None
+    if not clean:
+        return C(f"  {source_name}'s side files stayed"
+                 " - some of them differ in the target", "yl")
+    shutil.rmtree(src_dir)
+    return None
 
 
 def handoff_moves(a):
@@ -900,15 +1018,24 @@ def cmd_handoff(a):
         elif verdict in ("ahead", "diverged"):
             was = "further along" if verdict == "ahead" else "different"
             print(C(f"  would overwrite a copy that is {was} ({counts[0]} turns)", "rd"))
+        side, _ = handle_side_files(a, src, dst, enc, sid, src_name, C, D)
+        if side:
+            print("  " + side)
         if a.with_memory or a.force_memory:
             print(handle_memory(a, src, dst, enc, src_name, C, D))
         return 0
 
     if verdict == "identical":
         print(f"{a.target} already has this session, unchanged")
+        side, side_clean = handle_side_files(a, src, dst, enc, sid, src_name, C, D)
+        if side:
+            print("  " + side)
         if handoff_moves(a):
             bak = retire_source(f)
             print(D(f"  {src_name}'s copy retired as {bak}"))
+            stayed = retire_side(src, enc, sid, side_clean, src_name, C)
+            if stayed:
+                print(stayed)
         print()
         print(f"  claude-profile {a.target} && claude --resume {sid}")
         return 0
@@ -917,22 +1044,26 @@ def cmd_handoff(a):
     if verdict in ("ahead", "diverged"):          # only reachable with --force
         shutil.copy2(dst_file, dst_file + ".bak")
     shutil.copy2(f, dst_file)
+    side, side_clean = handle_side_files(a, src, dst, enc, sid, src_name, C, D)
 
-    retired = None
+    retired = stayed = None
     if handoff_moves(a):
-        with open(f, "rb") as x, open(dst_file, "rb") as y:
-            landed = x.read() == y.read()
-        if not landed:
+        if not same_bytes(f, dst_file):
             print(f"copy to {a.target} did not verify - {src_name}'s copy left in place",
                   file=sys.stderr)
             return 1
         retired = retire_source(f)
+        stayed = retire_side(src, enc, sid, side_clean, src_name, C)
 
     info = scan(f) if os.path.exists(f) else scan(dst_file)
     print(f"{'moved' if retired else 'handed off'} session {C(sid,'cy')}")
     print(f"  from: {src_name}   to: {a.target}")
     if info and info[0]:
         print(f"  dir : {info[0].replace(HOME,'~')}")
+    if side:
+        print("  " + side)
+    if stayed:
+        print(stayed)
     if retired:
         print(D(f"  {src_name}'s copy retired as {retired} - undo by renaming it back"))
     if verdict == "behind":
@@ -1593,6 +1724,16 @@ def cmd_doctor(a):
             else:
                 bad(f"{e} is orphaned - no profile maps to it "
                     f"(security delete-generic-password -a \"$USER\" -s \"{e}\")")
+
+    print(C("\nstranded session files", "b"))
+    found = False
+    for n in names:
+        for _, sid, size in stranded_side_dirs(n):
+            found = True
+            warn(f"{n}: {sid[:8]} has side files but no transcript ({human(size)}) - "
+                 "the session was handed off before 2.1.0, which left them behind")
+    if not found:
+        ok("every session's side files sit with its transcript")
 
     print(C("\nproject markers", "b"))
     markers = find_markers()

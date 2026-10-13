@@ -25,6 +25,7 @@ prints the command to continue it:
 moved session 0a9014e8-8806-43cf-98fd-28fad1353923
   from: default   to: work
   dir : ~/projects/<project-name>/api
+  side files: 24 copied
   default's copy retired as 0a9014e8-8806-43cf-98fd-28fad1353923.jsonl.bak - undo by renaming it back
 
   claude-profile work && claude --resume 0a9014e8-8806-43cf-98fd-28fad1353923
@@ -73,6 +74,7 @@ resume without counting.
 ## What it does not do
 
 - **Does not lose anything.** The original is renamed to `<session-id>.jsonl.bak`, not deleted, so a handoff that went somewhere unexpected is one rename from undone.
+- **Does not leave half the session behind.** Big tool results and subagent transcripts live in a `<session-id>/` directory beside the file. They travel with it. ([detail](../commands/sessions.md#the-sessions-own-side-files))
 - **Does not touch your code.** Same project folder, same files, same git branch.
 - **Does not transfer your limit.** That is the point: the other account has its own quota.
 
@@ -127,6 +129,10 @@ An ambiguous prefix lists the candidates rather than guessing.
         v
 ~/.claude/projects/<encoded-dir>/<session-id>.jsonl.bak
 ```
+
+The `<session-id>/` directory of side files beside the transcript moves the same
+way: files the target does not have are copied, and the source directory is
+removed once every one of them is confirmed identical.
 
 The source is only touched after the target is confirmed identical. If the copy
 does not verify, the source is left exactly as it was.

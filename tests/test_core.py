@@ -636,6 +636,57 @@ class TestUpstreamChecks(Fixture):
         self.assertNotIn("claude code integration", out)
 
 
+class TestStrandedSideFiles(Fixture):
+    """Handoffs made before 2.1.0 left the <sid>/ directory in the source
+    profile. doctor has to point at them."""
+
+    def setUp(self):
+        super().setUp()
+        self.proj = os.path.join(self.home, "code", "api")
+        os.makedirs(self.proj, exist_ok=True)
+        self.enc = encode_dir(self.proj)
+        self.pdir = os.path.join(self.ph, "work", "projects", self.enc)
+        self.sid = "aaa11111-0000-0000-0000-000000000000"
+
+    def side(self, sid):
+        path = os.path.join(self.pdir, sid, "tool-results", "r1.txt")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            fh.write("x" * 100)
+
+    def test_a_directory_without_its_transcript_is_reported(self):
+        self.side(self.sid)
+        code, out, _ = self.run_cmd("doctor")
+        self.assertIn("stranded session files", out)
+        self.assertIn("aaa11111", out)
+
+    def test_one_that_sits_with_its_transcript_is_not_reported(self):
+        self.side(self.sid)
+        transcript(os.path.join(self.pdir, self.sid + ".jsonl"), self.proj, ["hi"])
+        _, out, _ = self.run_cmd("doctor")
+        self.assertNotIn("aaa11111", out)
+        self.assertIn("sit with its transcript", out)
+
+    def test_memory_is_not_mistaken_for_a_session_directory(self):
+        mem = os.path.join(self.pdir, "memory")
+        os.makedirs(mem, exist_ok=True)
+        with open(os.path.join(mem, "MEMORY.md"), "w") as fh:
+            fh.write("- [a](a.md)\n")
+        _, out, _ = self.run_cmd("doctor")
+        self.assertIn("sit with its transcript", out)
+
+    def test_a_bak_does_not_count_as_a_live_transcript(self):
+        self.side(self.sid)
+        with open(os.path.join(self.pdir, self.sid + ".jsonl.bak"), "w") as fh:
+            fh.write("{}\n")
+        _, out, _ = self.run_cmd("doctor")
+        self.assertIn("aaa11111", out)
+
+    def test_nothing_to_report_on_an_empty_profile(self):
+        _, out, _ = self.run_cmd("doctor")
+        self.assertIn("sit with its transcript", out)
+
+
 class TestHandoff(Fixture):
     def setUp(self):
         super().setUp()
@@ -765,6 +816,115 @@ class TestHandoff(Fixture):
         code, out, _ = self.run_cmd("handoff", "work", "-d", self.proj)
         self.assertEqual(code, 0)
         self.assertIn("aaa99999", out)
+
+
+class TestHandoffSideFiles(Fixture):
+    """Claude Code spills tool results and subagent logs into <sid>/ next to
+    the transcript. A handoff has to take them, or the resumed session in the
+    target profile loses them."""
+
+    def setUp(self):
+        super().setUp()
+        self.proj = os.path.join(self.home, "code", "api")
+        os.makedirs(self.proj, exist_ok=True)
+        self.enc = encode_dir(self.proj)
+        self.sid = "aaa11111-0000-0000-0000-000000000000"
+        transcript(os.path.join(self.home, ".claude", "projects", self.enc,
+                                self.sid + ".jsonl"), self.proj, ["fix the auth bug"])
+        self.src_side = os.path.join(self.home, ".claude", "projects",
+                                     self.enc, self.sid)
+        self.write(os.path.join(self.src_side, "tool-results", "r1.txt"), "big output")
+        self.write(os.path.join(self.src_side, "subagents", "workflows",
+                                "wf_1", "journal.jsonl"), "{}\n")
+
+    def write(self, path, text):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            fh.write(text)
+
+    def dst_side(self, *parts):
+        return os.path.join(self.ph, "work", "projects", self.enc, self.sid, *parts)
+
+    def src_file(self):
+        return os.path.join(self.home, ".claude", "projects", self.enc,
+                            self.sid + ".jsonl")
+
+    def test_side_files_come_along(self):
+        code, out, _ = self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        self.assertEqual(code, 0)
+        self.assertTrue(os.path.isfile(self.dst_side("tool-results", "r1.txt")))
+        self.assertTrue(os.path.isfile(self.dst_side("subagents", "workflows",
+                                                     "wf_1", "journal.jsonl")))
+        self.assertIn("side files", out)
+
+    def test_contents_survive_the_trip(self):
+        self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        with open(self.dst_side("tool-results", "r1.txt")) as fh:
+            self.assertEqual(fh.read(), "big output")
+
+    def test_a_move_takes_the_side_directory_with_it(self):
+        self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        self.assertFalse(os.path.exists(self.src_side),
+                         "a move must not leave side files behind")
+
+    def test_a_copy_leaves_the_side_directory_alone(self):
+        self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj, "--copy")
+        self.assertTrue(os.path.isfile(os.path.join(self.src_side,
+                                                    "tool-results", "r1.txt")))
+        self.assertTrue(os.path.isfile(self.dst_side("tool-results", "r1.txt")))
+
+    def test_a_differing_file_keeps_the_targets_copy(self):
+        self.write(self.dst_side("tool-results", "r1.txt"), "the target's own")
+        code, out, _ = self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        self.assertEqual(code, 0)
+        with open(self.dst_side("tool-results", "r1.txt")) as fh:
+            self.assertEqual(fh.read(), "the target's own")
+        self.assertIn("kept the target's", out)
+
+    def test_a_differing_file_keeps_the_source_directory(self):
+        self.write(self.dst_side("tool-results", "r1.txt"), "the target's own")
+        _, out, _ = self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        self.assertTrue(os.path.isfile(os.path.join(self.src_side,
+                                                    "tool-results", "r1.txt")),
+                        "nothing may be dropped on a conflict")
+        self.assertIn("side files stayed", out)
+
+    def test_an_identical_file_is_not_recopied(self):
+        self.write(self.dst_side("tool-results", "r1.txt"), "big output")
+        _, out, _ = self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        self.assertIn("already there", out)
+        self.assertFalse(os.path.exists(self.src_side))
+
+    def test_dry_run_writes_no_side_files(self):
+        code, out, _ = self.run_cmd("handoff", "work", "aaa11111", "-d",
+                                    self.proj, "--dry-run")
+        self.assertEqual(code, 0)
+        self.assertIn("side files: 2 to copy", out)
+        self.assertFalse(os.path.exists(self.dst_side()))
+        self.assertTrue(os.path.isdir(self.src_side))
+
+    def test_a_refused_handoff_keeps_the_side_files(self):
+        transcript(os.path.join(self.ph, "work", "projects", self.enc,
+                                self.sid + ".jsonl"),
+                   self.proj, ["a", "b", "c", "d", "e"])
+        code, _, _ = self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        self.assertEqual(code, 1)
+        self.assertTrue(os.path.isdir(self.src_side))
+
+    def test_an_identical_target_still_moves_the_side_files(self):
+        self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj, "--copy")
+        shutil.rmtree(self.dst_side())
+        code, out, _ = self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        self.assertEqual(code, 0)
+        self.assertIn("unchanged", out)
+        self.assertTrue(os.path.isfile(self.dst_side("tool-results", "r1.txt")))
+        self.assertFalse(os.path.exists(self.src_side))
+
+    def test_a_session_with_no_side_files_is_fine(self):
+        shutil.rmtree(self.src_side)
+        code, out, _ = self.run_cmd("handoff", "work", "aaa11111", "-d", self.proj)
+        self.assertEqual(code, 0)
+        self.assertNotIn("side files", out)
 
 
 class TestHandoffOverwrite(Fixture):

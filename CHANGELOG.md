@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-10-13
+
+### Added
+
+- **`claude-handoff` now takes the session's side files with it.** Claude Code
+  spills large tool results, subagent transcripts and workflow journals into a
+  `<session-id>/` directory beside the transcript. Handoff moved the transcript
+  and left that directory behind, so a resumed session lost them. They now
+  travel with the transcript, no flag needed - they belong to that one session,
+  unlike memory, which is shared by the whole project and still needs
+  `--with-memory`.
+  - Merging never overwrites: a file the target already has with different
+    contents is kept, and a move then leaves the source directory in place and
+    says so.
+  - `--copy` copies the side files and leaves the originals alone.
+- `claude-doctor` reports stranded side-file directories - ones whose
+  transcript is no longer in that profile, left behind by a handoff made before
+  this release.
+
+### Changed
+
+- Transcript comparisons read in 64 KiB chunks instead of loading both files
+  into memory. A 275 MB transcript no longer needs 550 MB to verify.
+
 ## [2.0.0] - 2026-10-13
 
 ### Changed - breaking
@@ -372,6 +396,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[2.1.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v2.1.0
 [2.0.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v2.0.0
 [1.10.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.10.0
 [1.9.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.9.0

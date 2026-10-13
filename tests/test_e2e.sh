@@ -94,6 +94,10 @@ check  "  landed in the target"           '[ -n "$(find "$CLAUDE_PROFILE_HOME/al
 check  "  source is no longer resumable"  '[ ! -f "$HOME/.claude/projects/-tmp-proj/bbb22222-0000-0000-0000-000000000000.jsonl" ]'
 check  "  source kept as a .bak"          '[ -f "$HOME/.claude/projects/-tmp-proj/bbb22222-0000-0000-0000-000000000000.jsonl.bak" ]'
 expect "CLAUDE_HANDOFF_COPY switches the default" 'export CLAUDE_HANDOFF_COPY=1; claude-handoff alpha aaa11111 -d /tmp/proj' "unchanged"
+_run 'P="$HOME/.claude/projects/-tmp-proj"; S=ccc33333-0000-0000-0000-000000000000; printf "{\"type\":\"user\",\"cwd\":\"/tmp/proj\",\"message\":{\"content\":\"third\"}}\n" > "$P/$S.jsonl"; mkdir -p "$P/$S/tool-results"; printf big > "$P/$S/tool-results/r1.txt"' >/dev/null
+expect "takes the session side files too"  'claude-handoff alpha ccc33333 -d /tmp/proj'      "side files"
+check  "  side files landed"               '[ -f "$CLAUDE_PROFILE_HOME/alpha/projects/-tmp-proj/ccc33333-0000-0000-0000-000000000000/tool-results/r1.txt" ]'
+check  "  source side dir is gone"         '[ ! -d "$HOME/.claude/projects/-tmp-proj/ccc33333-0000-0000-0000-000000000000" ]'
 expect "refuses an unknown target"        'claude-handoff nosuch -d /tmp/proj 2>&1'         "no such profile"
 expect "refuses a traversal target"       'claude-handoff ../escape -d /tmp/proj 2>&1'      "invalid profile name"
 
