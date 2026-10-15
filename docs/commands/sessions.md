@@ -304,6 +304,14 @@ claude-clear                            # the current directory
 claude-clear ~/projects/<project-name>  # a specific project
 ```
 
+!!! tip "Look before you delete"
+    Add `-n` to any of these. It prints the same list and the exact files it
+    would remove, and deletes nothing.
+
+    ```sh
+    claude-clear ~/projects/<project-name> -n --all
+    ```
+
 It checks the path exists first, then lists what it found and asks which to
 delete:
 
@@ -374,10 +382,25 @@ For scripts, choose up front. Without a selection and without a terminal it
 refuses rather than guessing:
 
 ```sh
-claude-clear ~/projects/<project-name> -s c9f6d2ae -y   # one session
+claude-clear ~/projects/<project-name> -s a3f81c2e -y   # one session
 claude-clear ~/projects/<project-name> --all -y         # all of them
 claude-clear ~/projects/<project-name> --all -n         # just show the plan
 ```
+
+### Recipes
+
+| Goal | Command |
+|---|---|
+| See what is there, change nothing | `claude-clear ~/projects/<project-name> -n --all` |
+| Clear the project you are standing in | `claude-clear` |
+| Include sessions from its subfolders | `claude-clear ~/projects/<project-name> -r` |
+| Only one account's copies | `claude-clear ~/projects/<project-name> -p work` |
+| Drop one session by its id prefix | `claude-clear ~/projects/<project-name> -s a3f81c2e -y` |
+| Wipe the project, no prompt | `claude-clear ~/projects/<project-name> --all -y` |
+| Easier to read in a narrow window | add `--plain` |
+
+Flags combine, so `-r -p work -n` previews everything `work` recorded in that
+project and below it.
 
 !!! danger "There is no undo"
     Unlike a handoff, this deletes. `claude --resume` cannot reach a cleared

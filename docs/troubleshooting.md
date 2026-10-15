@@ -187,9 +187,11 @@ You have several GitHub accounts and plain `git@github.com:` resolved to the
 wrong one. Use the host alias from your `~/.ssh/config`:
 
 ```sh
-git remote set-url origin github-nandeep2750:Nandeep2750/claude-profiles.git
-ssh -T github-nandeep2750                 # confirms which identity that alias uses
+git remote set-url origin github-<alias>:<your-account>/<your-repo>.git
+ssh -T github-<alias>                     # confirms which identity that alias uses
 ```
+
+`<alias>` is whatever you named the `Host` entry in `~/.ssh/config`.
 
 ## Starting over
 
