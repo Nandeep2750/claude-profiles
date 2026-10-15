@@ -59,7 +59,7 @@ those are listed here so they do not surprise you.
 
 | Version | Change | To keep the old behaviour |
 |---|---|---|
-| 2.3.0 | Deleting a session also removes `file-history/`, `jobs/` and other folders named after it. Run `claude-clear --traces` once to clear what older versions left behind. | nothing to change - the old behaviour left your file contents on disk |
+| 2.3.0 | Deleting a session, with either `claude-clear` or `claude-prune`, also removes `file-history/`, `jobs/` and the other folders named after it. `claude-prune` gains `--orphaned` and `--traces`. Run `claude-prune --traces` once to clear what older versions left behind. | nothing to change - the old behaviour left your file contents on disk |
 | 2.2.0 | `claude-prune` no longer counts a session's side files as sessions. Earlier versions listed them and `--yes` deleted them. | nothing to change - the old behaviour was a bug |
 | 2.1.0 | `claude-handoff` also moves the session's `<session-id>/` directory of tool results and subagent logs. Handoffs made before this release left it in the old profile - `claude-doctor` lists any that are stranded. | nothing to change |
 | 2.0.0 | `claude-handoff` **moves** a session instead of copying it. The source is renamed to `<session-id>.jsonl.bak`. | `--copy` per command, or `CLAUDE_HANDOFF_COPY=1` |

@@ -44,7 +44,7 @@ What it checks:
 | shell wiring | exactly one `source` line per rc file, pointing at a file that exists |
 | profiles | which are signed in; `.credentials.json` not readable by other users |
 | keychain | macOS entries that no longer map to any profile - left behind by deleting a profile with `rm -rf` |
-| stranded session files | files named after a session the profile no longer has: a `<session-id>/` directory of tool results left by a handoff made before 2.1.0, or `file-history/`, `jobs/` and friends left by a delete made before 2.3.0. Clear them with [`claude-clear --traces`](sessions.md#sweeping-up-after-older-versions) |
+| stranded session files | files named after a session the profile no longer has: a `<session-id>/` directory of tool results left by a handoff made before 2.1.0, or `file-history/`, `jobs/` and friends left by a delete made before 2.3.0. Clear them with [`claude-prune --traces`](sessions.md#-traces-leftovers-of-sessions-already-deleted) |
 | project markers | `.claude-profile` files that are empty or name a profile that does not exist |
 
 Exits non-zero if it finds problems, so it works in a script. Warnings alone

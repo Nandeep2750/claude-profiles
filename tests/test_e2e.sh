@@ -113,11 +113,17 @@ expect "deletes what was chosen"            'claude-clear "$HOME/work/app" -s ee
 check  "  transcript is gone"               '[ ! -f "$HOME/.claude/projects/-tmp-clearme/eee55555-0000-0000-0000-000000000000.jsonl" ]'
 check  "  side files are gone"              '[ ! -d "$HOME/.claude/projects/-tmp-clearme/eee55555-0000-0000-0000-000000000000" ]'
 _run 'mkdir -p "$HOME/.claude/file-history/eee55555-0000-0000-0000-000000000000"; printf src > "$HOME/.claude/file-history/eee55555-0000-0000-0000-000000000000/v1"' >/dev/null
-expect "finds files left by a deleted session" 'claude-clear --traces -n --plain' "file-history"
-check  "  dry run kept them"                   '[ -d "$HOME/.claude/file-history/eee55555-0000-0000-0000-000000000000" ]'
-expect "sweeps them with --yes"                'claude-clear --traces -y --plain' "freed"
-check  "  they are gone"                       '[ ! -d "$HOME/.claude/file-history/eee55555-0000-0000-0000-000000000000" ]'
-expect "--traces takes no path"                'claude-clear "$HOME" --traces 2>&1' "takes no path"
+expect "prune finds files a deleted session left" 'claude-prune --traces --plain' "file-history"
+check  "  a prune lists before it deletes"       '[ -d "$HOME/.claude/file-history/eee55555-0000-0000-0000-000000000000" ]'
+expect "prune --traces -y sweeps them"           'claude-prune --traces -y --plain' "freed"
+check  "  they are gone"                         '[ ! -d "$HOME/.claude/file-history/eee55555-0000-0000-0000-000000000000" ]'
+# a profile of its own: other sandbox sessions record directories that are not
+# there either, and they are rightly orphans too
+_run 'claude-profile omega >/dev/null; mkdir -p "$HOME/short-lived"; P="$CLAUDE_PROFILE_HOME/omega/projects/-tmp-orphan"; mkdir -p "$P"; printf "{\"type\":\"user\",\"cwd\":\"$HOME/short-lived\",\"message\":{\"content\":\"hello\"}}\n" > "$P/fff66666-0000-0000-0000-000000000000.jsonl"; rmdir "$HOME/short-lived"; claude-profile default >/dev/null' >/dev/null
+expect "prune --orphaned finds a gone directory" 'claude-prune --orphaned -p omega --plain' "fff66666"
+check  "  listing alone deleted nothing"         '[ -f "$CLAUDE_PROFILE_HOME/omega/projects/-tmp-orphan/fff66666-0000-0000-0000-000000000000.jsonl" ]'
+expect "prune --orphaned -y deletes it"          'claude-prune --orphaned -p omega -y --plain' "freed"
+check  "  the orphan is gone"                    '[ ! -f "$CLAUDE_PROFILE_HOME/omega/projects/-tmp-orphan/fff66666-0000-0000-0000-000000000000.jsonl" ]'
 
 echo "-- sessions --"
 expect "lists them"                       'claude-sessions -a -d /tmp/proj'                 "SESSION ID"

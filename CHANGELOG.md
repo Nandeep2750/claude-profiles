@@ -9,35 +9,46 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - **Deleting a session left its content on disk.** Claude Code keys several
-  folders beside `projects/` by session id, and `claude-clear` only swept the
-  transcript and its side files. The worst of them was
-  `file-history/<session-id>/`, which holds readable copies of every file that
-  session edited, version by version; `jobs/<short-id>/` held a background
-  job's state and timeline. Clearing a session now removes anything in the
-  profile named exactly `<session-id>` or `<session-id>.*`, plus the
-  8-character prefix `jobs/` uses. `memory/` is still kept, and a name that
-  merely contains the id is never touched. The short-prefix rule applies to
-  `jobs/` alone, and is skipped when two sessions share those eight
-  characters, so clearing some of a project's sessions cannot reach the ones
-  you kept.
+  folders beside `projects/` by session id, and both `claude-clear` and
+  `claude-prune` only removed the transcript and, for clear, the side files
+  next to it. The worst of them was `file-history/<session-id>/`, which holds
+  readable copies of every file that session edited, version by version;
+  `jobs/<short-id>/` held a background job's state and timeline. Both commands
+  now remove anything in the profile named exactly `<session-id>` or
+  `<session-id>.*`, plus the 8-character prefix `jobs/` uses, and report the
+  real total freed rather than the transcript's size alone.
+  - The short-prefix rule applies to `jobs/` alone and is skipped when two
+    sessions share those eight characters, so clearing some of a project's
+    sessions cannot reach the ones you kept. `memory/` is still kept, and a
+    name that merely contains the id is never touched.
 - The confirmation list now says what each file held
   (`copies of the files it edited`) instead of labelling every directory
   `side files`.
 
 ### Added
 
-- **`claude-clear --traces`** sweeps files left behind by sessions that are
-  already gone - from `claude-prune`, which never removed them, or from
-  `claude-clear` before this release. It only removes files named after a
-  session the profile no longer has, lists them grouped by profile and folder
-  first, and asks before deleting.
-- `claude-doctor` reports those leftovers, with the command to clear them.
+- **`claude-prune --orphaned`** - sessions whose recorded working directory no
+  longer exists. You delete a project folder and its conversations stay in the
+  profile, unresumable but still holding everything that was said. A transcript
+  with no readable working directory is never called an orphan.
+- **`claude-prune --traces`** - files left behind by sessions that are already
+  deleted, whether by an older version of these commands or by anything else.
+  Liveness is judged across every profile, so a session handed to another
+  profile is never mistaken for a deleted one.
+- Selectors combine: `claude-prune -o 90 --orphaned` takes both, lists a
+  session once when both reasons apply, and shows a `WHY` column when the rows
+  differ. `--orphaned` or `--traces` on their own replace the age default
+  rather than adding to it.
+- `claude-doctor` reports leftovers and names the command that clears them.
 
 ### Changed
 
-- The documentation now states plainly that deleting unlinks rather than
-  erases, and that a secret a session saw should be rotated rather than
-  deleted.
+- `claude-prune` is now the housekeeping command in the sense Docker uses the
+  word - remove what is no longer needed - rather than an age-only sweep.
+  `claude-clear PATH` stays the targeted one: a numbered list for a single
+  project. It validates `--profile` the way the other commands do.
+- The documentation now says plainly that deleting unlinks rather than erases,
+  and that a secret a session saw should be rotated rather than deleted.
 
 ## [2.2.0] - 2026-10-15
 

@@ -577,7 +577,7 @@ class TestPartialDelete(Fixture):
 
     def test_a_traces_sweep_afterwards_removes_nothing_more(self):
         self.delete(*self.IDS[:4])
-        code, out, _ = self.run_cmd("clear", "--traces", "--yes", "--plain")
+        code, out, _ = self.run_cmd("prune", "--traces", "--yes", "--plain")
         self.assertEqual(code, 0)
         self.assertIn("nothing left over", out)
         for sid in self.IDS[4:]:
@@ -917,6 +917,134 @@ class TestClear(Fixture):
             fh.write("{}\n")
         parts = self.core.session_parts(self.w_file)
         self.assertEqual(sorted(parts), sorted([self.w_file, self.w_file + ".bak", side]))
+
+
+class TestPruneOrphaned(Fixture):
+    """A session whose project directory is gone cannot be usefully resumed,
+    but it still holds everything that was said there."""
+
+    def setUp(self):
+        super().setUp()
+        self.here = os.path.join(self.home, "code", "here")
+        self.gone = os.path.join(self.home, "code", "gone")
+        os.makedirs(self.here, exist_ok=True)
+        os.makedirs(self.gone, exist_ok=True)
+        self.wdir = os.path.join(self.ph, "work")
+        self.live = os.path.join(self.wdir, "projects", encode_dir(self.here),
+                                 "aaa11111-0000-0000-0000-000000000000.jsonl")
+        self.dead = os.path.join(self.wdir, "projects", encode_dir(self.gone),
+                                 "bbb22222-0000-0000-0000-000000000000.jsonl")
+        transcript(self.live, self.here, ["still working here"])
+        transcript(self.dead, self.gone, ["project since deleted"])
+        shutil.rmtree(self.gone)
+
+    def test_the_orphan_is_detected(self):
+        found = [os.path.basename(f) for f, _, _ in
+                 self.core.orphaned_sessions("work")]
+        self.assertEqual(found, [os.path.basename(self.dead)])
+
+    def test_a_plain_prune_ignores_it(self):
+        code, out, _ = self.run_cmd("prune", "-o", "3650", "--yes", "--plain")
+        self.assertEqual(code, 0)
+        self.assertTrue(os.path.isfile(self.dead), "age alone must not take it")
+
+    def test_orphaned_lists_it(self):
+        code, out, _ = self.run_cmd("prune", "--orphaned", "--plain")
+        self.assertEqual(code, 0)
+        self.assertIn("bbb22222", out)
+        self.assertNotIn("aaa11111", out)
+
+    def test_orphaned_is_a_dry_run_without_yes(self):
+        self.run_cmd("prune", "--orphaned", "--plain")
+        self.assertTrue(os.path.isfile(self.dead))
+
+    def test_orphaned_deletes_it_with_yes(self):
+        code, _, _ = self.run_cmd("prune", "--orphaned", "--yes", "--plain")
+        self.assertEqual(code, 0)
+        self.assertFalse(os.path.exists(self.dead))
+        self.assertTrue(os.path.isfile(self.live), "a live project is untouched")
+
+    def test_orphaned_alone_does_not_sweep_by_age(self):
+        long_ago = time.time() - 400 * 86400
+        os.utime(self.live, (long_ago, long_ago))
+        self.run_cmd("prune", "--orphaned", "--yes", "--plain")
+        self.assertTrue(os.path.isfile(self.live),
+                        "--orphaned must not imply the age default")
+
+    def test_age_and_orphaned_combine(self):
+        long_ago = time.time() - 400 * 86400
+        os.utime(self.live, (long_ago, long_ago))
+        code, out, _ = self.run_cmd("prune", "-o", "90", "--orphaned", "--plain")
+        self.assertEqual(code, 0)
+        self.assertIn("aaa11111", out)
+        self.assertIn("bbb22222", out)
+        self.assertIn("WHY", out, "two reasons means the column is shown")
+
+    def test_a_session_counted_once_when_both_reasons_apply(self):
+        long_ago = time.time() - 400 * 86400
+        os.utime(self.dead, (long_ago, long_ago))
+        _, out, _ = self.run_cmd("prune", "-o", "90", "--orphaned", "--plain")
+        self.assertEqual(out.count("bbb22222"), 1)
+
+    def test_an_unreadable_transcript_is_not_called_an_orphan(self):
+        junk = os.path.join(self.wdir, "projects", encode_dir(self.here),
+                            "ccc33333-0000-0000-0000-000000000000.jsonl")
+        with open(junk, "w") as fh:
+            fh.write("not json\n")
+        self.run_cmd("prune", "--orphaned", "--yes", "--plain")
+        self.assertTrue(os.path.isfile(junk), "no recorded directory, no verdict")
+
+
+class TestPruneTakesEverything(Fixture):
+    """prune used to remove the transcript and leave the rest on disk."""
+
+    def setUp(self):
+        super().setUp()
+        self.proj = os.path.join(self.home, "code", "api")
+        os.makedirs(self.proj, exist_ok=True)
+        self.enc = encode_dir(self.proj)
+        self.wdir = os.path.join(self.ph, "work")
+        self.sid = "aaa11111-0000-0000-0000-000000000000"
+        self.keep = "bbb22222-0000-0000-0000-000000000000"
+        self.f = os.path.join(self.wdir, "projects", self.enc, self.sid + ".jsonl")
+        transcript(self.f, self.proj, ["old work"])
+        transcript(os.path.join(self.wdir, "projects", self.enc,
+                                self.keep + ".jsonl"), self.proj, ["recent"])
+        long_ago = time.time() - 400 * 86400
+        os.utime(self.f, (long_ago, long_ago))
+        self.side = os.path.join(self.wdir, "projects", self.enc, self.sid,
+                                 "tool-results", "r1.txt")
+        self.hist = os.path.join(self.wdir, "file-history", self.sid, "v1")
+        self.keep_hist = os.path.join(self.wdir, "file-history", self.keep, "v1")
+        for path in (self.side, self.hist, self.keep_hist):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w") as fh:
+                fh.write("x" * 4000)
+
+    def test_the_side_files_go_too(self):
+        code, _, _ = self.run_cmd("prune", "-o", "90", "--yes", "--plain")
+        self.assertEqual(code, 0)
+        self.assertFalse(os.path.exists(self.side))
+
+    def test_the_file_history_goes_too(self):
+        self.run_cmd("prune", "-o", "90", "--yes", "--plain")
+        self.assertFalse(os.path.exists(self.hist),
+                         "it holds copies of the files that session edited")
+
+    def test_a_newer_sessions_files_are_untouched(self):
+        self.run_cmd("prune", "-o", "90", "--yes", "--plain")
+        self.assertTrue(os.path.isfile(self.keep_hist))
+        self.assertTrue(os.path.isfile(os.path.join(
+            self.wdir, "projects", self.enc, self.keep + ".jsonl")))
+
+    def test_the_size_counts_everything_it_removes(self):
+        _, out, _ = self.run_cmd("prune", "-o", "90", "--plain")
+        self.assertIn("KB", out, "the transcript alone is a few hundred bytes")
+
+    def test_doctor_finds_nothing_stranded_afterwards(self):
+        self.run_cmd("prune", "-o", "90", "--yes", "--plain")
+        _, out, _ = self.run_cmd("doctor")
+        self.assertIn("nothing is left over", out)
 
 
 class TestPrune(Fixture):
@@ -1304,11 +1432,11 @@ class TestSessionTraces(Fixture):
 
     def test_traces_mode_lists_and_deletes_them(self):
         orphan = self.trace("file-history", self.other)
-        code, out, _ = self.run_cmd("clear", "--traces", "--dry-run", "--plain")
+        code, out, _ = self.run_cmd("prune", "--traces", "--plain")
         self.assertEqual(code, 0)
         self.assertIn("file-history", out)
-        self.assertTrue(os.path.exists(orphan), "dry run must not delete")
-        code, out, _ = self.run_cmd("clear", "--traces", "--yes", "--plain")
+        self.assertTrue(os.path.exists(orphan), "a prune is a dry run by default")
+        code, out, _ = self.run_cmd("prune", "--traces", "--yes", "--plain")
         self.assertEqual(code, 0)
         self.assertFalse(os.path.exists(orphan))
 
@@ -1319,7 +1447,7 @@ class TestSessionTraces(Fixture):
                                 self.other + ".jsonl"), self.proj, ["moved here"])
         self.assertEqual(self.core.stranded_traces("work"), [],
                          "the session still exists, in another profile")
-        self.run_cmd("clear", "--traces", "--yes", "--plain")
+        self.run_cmd("prune", "--traces", "--yes", "--plain")
         self.assertTrue(os.path.exists(moved), "a resumable session lost its history")
 
     def test_doctor_is_quiet_about_a_session_held_in_another_profile(self):
@@ -1331,22 +1459,25 @@ class TestSessionTraces(Fixture):
 
     def test_traces_mode_keeps_a_live_sessions_files(self):
         mine = self.trace("file-history", self.sid)
-        self.run_cmd("clear", "--traces", "--yes", "--plain")
+        self.run_cmd("prune", "--traces", "--yes", "--plain")
         self.assertTrue(os.path.exists(mine), "this session still exists")
 
-    def test_traces_mode_refuses_a_path(self):
-        code, _, err = self.run_cmd("clear", self.proj, "--traces")
-        self.assertEqual(code, 2)
-        self.assertIn("takes no path", err)
+    def test_traces_alone_does_not_sweep_by_age(self):
+        old = os.path.join(self.wdir, "projects", self.enc, self.sid + ".jsonl")
+        long_ago = time.time() - 400 * 86400
+        os.utime(old, (long_ago, long_ago))
+        self.trace("file-history", self.other)
+        self.run_cmd("prune", "--traces", "--yes", "--plain")
+        self.assertTrue(os.path.isfile(old), "--traces must not imply an age sweep")
 
     def test_traces_mode_says_so_when_there_is_nothing(self):
-        code, out, _ = self.run_cmd("clear", "--traces", "--plain")
+        code, out, _ = self.run_cmd("prune", "--traces", "--plain")
         self.assertEqual(code, 0)
         self.assertIn("nothing left over", out)
 
     def test_traces_mode_can_be_limited_to_one_profile(self):
         orphan = self.trace("file-history", self.other)
-        code, out, _ = self.run_cmd("clear", "--traces", "-p", "empty",
+        code, out, _ = self.run_cmd("prune", "--traces", "-p", "empty",
                                     "--yes", "--plain")
         self.assertEqual(code, 0)
         self.assertTrue(os.path.exists(orphan), "a different profile was swept")

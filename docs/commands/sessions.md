@@ -356,7 +356,6 @@ this cannot be undone. type y to delete:
 | `-a`, `--all` | select every session listed |
 | `-n`, `--dry-run` | show what would go, delete nothing |
 | `-y`, `--yes` | skip the confirmation |
-| `--traces` | instead, sweep files left by sessions that are already deleted |
 | `--plain` | no borders |
 
 ### What it looks at, and what it deletes
@@ -409,30 +408,9 @@ that gone too.
 
 ### Sweeping up after older versions
 
-Before 2.3.0, `claude-clear` removed the transcript and its side files but not
-the folders beside `projects/`. `claude-prune` never removed them either.
-`claude-doctor` reports whatever is left, and one command clears it:
-
-```sh
-claude-clear --traces -n     # list what is left over, delete nothing
-claude-clear --traces        # list, then ask before deleting
-claude-clear --traces -p work
-```
-
-It only ever removes files named after a session that no longer exists in that
-profile, so nothing a live session needs can be caught by it.
-
-```
-119 file(s) named after sessions that no longer exist, 7.2MB
-
-╭─────────┬───────────────┬───────┬─────────┬───────────────────────────────╮
-│ PROFILE │ WHERE         │ FILES │    SIZE │ WHAT IT HELD                  │
-├─────────┼───────────────┼───────┼─────────┼───────────────────────────────┤
-│ default │ file-history  │     4 │   2.1MB │ copies of the files it edited │
-│ default │ jobs          │     2 │   2.3KB │ a background job's state      │
-│ work    │ session-env   │    29 │      0B │ its environment               │
-╰─────────┴───────────────┴───────┴─────────┴───────────────────────────────╯
-```
+Before 2.3.0, deleting a session left the folders beside `projects/` behind.
+[`claude-prune --traces`](#-traces-leftovers-of-sessions-already-deleted) clears
+them, and `claude-doctor` reports whatever is still there.
 
 ### Without a prompt
 
@@ -455,7 +433,7 @@ claude-clear ~/projects/<project-name> --all -n         # just show the plan
 | Only one account's copies | `claude-clear ~/projects/<project-name> -p work` |
 | Drop one session by its id prefix | `claude-clear ~/projects/<project-name> -s a3f81c2e -y` |
 | Wipe the project, no prompt | `claude-clear ~/projects/<project-name> --all -y` |
-| Clean up after older versions | `claude-clear --traces -n` |
+| Clean up after older versions | `claude-prune --traces` |
 | Easier to read in a narrow window | add `--plain` |
 
 Flags combine, so `-r -p work -n` previews everything `work` recorded in that
@@ -470,42 +448,104 @@ project and below it.
 
 ## `claude-prune`
 
-Delete old conversation transcripts. **Dry run by default.**
+Housekeeping: delete sessions you no longer need. **Dry run by default** - it
+always lists first and deletes nothing until you pass `--yes`.
+
+Three selectors, and you can combine them:
 
 ```sh
-claude-prune                      # show what is older than 90 days
+claude-prune                      # older than 90 days (the default)
 claude-prune -o 30                # ...older than 30 days
+claude-prune --orphaned           # the project directory no longer exists
+claude-prune --traces             # files left behind by sessions already deleted
+claude-prune --orphaned --traces  # both
 claude-prune -o 90 --yes          # actually delete
 ```
 
 ```
-╭────────┬─────────┬──────────────────────────────────────┬───────────────────────────────╮
-│ WHEN   │ PROFILE │ SESSION ID                           │ DIRECTORY                     │
-├────────┼─────────┼──────────────────────────────────────┼───────────────────────────────┤
-│ Aug 19 │ default │ a6c22511-53a7-4a10-8e16-104b79f2dc17 │ ~/projects/<project-name>/api │
-╰────────┴─────────┴──────────────────────────────────────┴───────────────────────────────╯
+╭────────┬─────────┬──────────────────────────────────────┬────────┬───────────────────────────────╮
+│ WHEN   │ PROFILE │ SESSION ID                           │   SIZE │ DIRECTORY                     │
+├────────┼─────────┼──────────────────────────────────────┼────────┼───────────────────────────────┤
+│ Aug 19 │ default │ a6c22511-53a7-4a10-8e16-104b79f2dc17 │  2.3MB │ ~/projects/<project-name>/api │
+╰────────┴─────────┴──────────────────────────────────────┴────────┴───────────────────────────────╯
 
-3 session(s) older than 90 days, 2.3MB  (90 newer session(s) untouched)
+3 session(s), 6.1MB  (90 session(s) untouched)
 dry run - nothing deleted. pass --yes to delete.
 ```
 
 | Flag | Effect |
 |---|---|
-| `-o DAYS`, `--older-than DAYS` | age threshold (default 90) |
+| `-o DAYS`, `--older-than DAYS` | age threshold (default 90, and the default selector) |
+| `--orphaned` | also sessions whose recorded directory is no longer on disk |
+| `--traces` | also files left behind by sessions that are already deleted |
 | `-p NAME`, `--profile NAME` | just one profile (default: all) |
 | `-n N`, `--limit N` | rows to list, `0` for all (default 20) |
 | `-y`, `--yes` | actually delete |
 | `--plain` | no borders |
 
-It reports how much space would be freed and how many newer sessions it is
-leaving alone, so you can see the what will be deleted before committing.
+Passing `--orphaned` or `--traces` replaces the age default rather than adding
+to it, so `claude-prune --orphaned` takes nothing merely for being old. Ask for
+both by naming both: `claude-prune -o 90 --orphaned`. A session that is old
+*and* orphaned is listed once, with a `WHY` column appearing when the rows have
+different reasons.
 
-`claude-prune` works by age across every project. To clear one project
-regardless of age, use [`claude-clear`](#claude-clear-path).
+Whatever it takes, it takes whole: the transcript, its side files and every
+[profile-level file named after it](#what-it-looks-at-and-what-it-deletes), the
+same as `claude-clear`. The size it reports is the total of all of them.
+
+### `--orphaned`: the project is gone
+
+You delete a project folder; its conversations stay in the profile. They cannot
+be usefully resumed - the working directory they refer to is not there - but
+they still hold everything that was said, and every file the session edited is
+still in `file-history/`.
+
+```sh
+claude-prune --orphaned           # list them
+claude-prune --orphaned --yes     # delete them
+```
+
+The directory is shown for each one, so you can check nothing is merely
+unmounted or on an external disk before confirming. A transcript with no
+readable working directory is never called an orphan - no evidence, no verdict.
+
+### `--traces`: leftovers of sessions already deleted
+
+Anything that removed a transcript without sweeping the folders beside
+`projects/` left files behind, named after a session that no longer exists.
+
+```sh
+claude-prune --traces             # list what is left over
+claude-prune --traces --yes       # delete it
+```
+
+Liveness is judged across every profile, not one: handing a session over moves
+its transcript but not these files, so a session living in another profile is
+never treated as deleted. `claude-doctor` reports whatever is left.
+
+```
+╭─────────┬───────────────┬───────┬─────────┬───────────────────────────────╮
+│ PROFILE │ WHERE         │ FILES │    SIZE │ WHAT IT HELD                  │
+├─────────┼───────────────┼───────┼─────────┼───────────────────────────────┤
+│ default │ file-history  │     4 │   2.1MB │ copies of the files it edited │
+│ default │ jobs          │     2 │   2.3KB │ a background job's state      │
+│ work    │ session-env   │    29 │      0B │ its environment               │
+╰─────────┴───────────────┴───────┴─────────┴───────────────────────────────╯
+```
+
+### prune or clear?
+
+| | `claude-prune` | `claude-clear PATH` |
+|---|---|---|
+| Picks by | age, orphaned, leftovers | one project directory |
+| Scope | every project, every profile | that directory |
+| You choose | no - the selector decides | yes, from a numbered list |
+| Safe by default | lists, needs `--yes` | you pick, then confirm |
 
 !!! danger "Deleted transcripts are gone"
     There is no undo, and `claude --resume` cannot reach a deleted session.
     Check the dry run first, and [hand off](../guides/handoff.md) anything worth
-    keeping.
+    keeping. Deleting unlinks rather than erases - rotate any secret a session
+    saw rather than relying on the delete.
 
 ---

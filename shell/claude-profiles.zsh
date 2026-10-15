@@ -189,6 +189,8 @@ _claude_prune() {
     '(-p --profile)'{-p,--profile}'[just this profile]:profile:_claude_profile_names' \
     '(-n --limit)'{-n,--limit}'[rows to list]:count:' \
     '(-y --yes)'{-y,--yes}'[actually delete]' \
+    '--orphaned[also sessions whose directory no longer exists]' \
+    '--traces[also files left by sessions already deleted]' \
     '--plain[no borders]'
 }
 compdef _claude_prune claude-prune
@@ -207,7 +209,6 @@ _claude_clear() {
     '(-a --all)'{-a,--all}'[select every session listed]' \
     '(-n --dry-run)'{-n,--dry-run}'[show what would go, delete nothing]' \
     '(-y --yes)'{-y,--yes}'[skip the confirmation]' \
-    '--traces[sweep files left by sessions that are already deleted]' \
     '--plain[no borders]'
 }
 compdef _claude_clear claude-clear

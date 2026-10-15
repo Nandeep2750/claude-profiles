@@ -71,7 +71,7 @@ same way on macOS, Linux, WSL and Windows.
 | [`claude-profile-clone`](manage.md#claude-profile-clone-source-target) | Seed a new profile's settings from an existing one |
 | [`claude-profile-remove`](manage.md#claude-profile-remove-name) | Delete a profile, its history and its credentials |
 | [`claude-clear`](sessions.md#claude-clear-path) | Delete one project's sessions, with a prompt |
-| [`claude-prune`](sessions.md#claude-prune) | Delete old transcripts (dry run by default) |
+| [`claude-prune`](sessions.md#claude-prune) | Delete sessions by age, orphaned, or leftovers (dry run by default) |
 | [`claude-doctor`](maintenance.md#claude-profiles-doctor) | Check the installation for problems |
 | [`claude-update`](maintenance.md#claude-update) | Check for and pull a newer version |
 | [`claude-profiles statusline`](statusline.md#claude-profiles-statusline) | A status line for inside Claude Code |

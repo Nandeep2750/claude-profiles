@@ -1314,55 +1314,154 @@ def cmd_clone(a):
     return 0
 
 
-def cmd_prune(a):
-    """Delete transcripts older than N days. Dry run unless --yes."""
-    C = color()
-    D = lambda t: C(t, "dim")
-    want = [a.profile] if a.profile else profile_names()
-    cutoff = time.time() - a.older_than * 86400
+def orphaned_sessions(pname):
+    """Sessions whose working directory is no longer on disk.
 
-    doomed, kept, freed = [], 0, 0
-    for p in want:
-        for f in transcripts(p):
+    You deleted the project; the transcript stayed behind. Nothing can usefully
+    resume it, and it still holds everything that was said there.
+    """
+    out = []
+    for f in transcripts(pname):
+        info = scan(f)
+        if info and info[0] and not os.path.isdir(info[0]):
+            out.append((f, info[0], info[3]))
+    return out
+
+
+def prune_targets(a, want):
+    """Which sessions a prune would take, and why. One row per session."""
+    by_age = a.older_than is not None or not (a.orphaned or a.traces)
+    days = 90 if a.older_than is None else a.older_than
+    cutoff = time.time() - days * 86400
+
+    rows, kept = [], 0
+    for prof in want:
+        orphans = {f for f, _, _ in orphaned_sessions(prof)} if a.orphaned else set()
+        live = live_session_ids(prof)
+        for f in transcripts(prof):
             mtime = os.path.getmtime(f)
-            if mtime < cutoff:
-                doomed.append((mtime, p, f, os.path.getsize(f)))
-                freed += os.path.getsize(f)
-            else:
+            why = []
+            if by_age and mtime < cutoff:
+                why.append("old")
+            if f in orphans:
+                why.append("gone")
+            if not why:
                 kept += 1
-    doomed.sort()
+                continue
+            sid = os.path.basename(f)[:-6]
+            info = scan(f)
+            parts = session_parts(f) + session_traces(profile_dir(prof), sid, live)
+            rows.append((mtime, prof, sid, (info[0] if info else None) or "?",
+                         why, parts, parts_size(parts)))
+    rows.sort()
+    return rows, kept, days
 
-    if not doomed:
-        print(f"nothing older than {a.older_than} days in {', '.join(want)}"
-              f" ({kept} session(s) kept)")
+
+def prune_traces(want):
+    """Leftovers of sessions that no longer exist in any profile."""
+    live = all_session_ids()
+    out = []
+    for prof in want:
+        for path, sid, top in stranded_traces(prof, live):
+            size = dir_size(path) if os.path.isdir(path) else os.path.getsize(path)
+            out.append((prof, sid, top, path, size))
+    return out
+
+
+def cmd_prune(a):
+    """Housekeeping: delete sessions you no longer need. Dry run unless --yes."""
+    C = color()
+    D = lambda t: C(t, "dim")          # noqa: E731
+    if a.profile:
+        try:
+            check_name(a.profile)
+        except BadProfileName as e:
+            print(str(e), file=sys.stderr)
+            return 1
+        if a.profile not in profile_names():
+            print(f"no such profile: {a.profile}", file=sys.stderr)
+            print("available: " + ", ".join(profile_names()), file=sys.stderr)
+            return 1
+    want = [a.profile] if a.profile else profile_names()
+
+    rows, kept, days = prune_targets(a, want)
+    traces = prune_traces(want) if a.traces else []
+    freed = sum(r[6] for r in rows) + sum(t[4] for t in traces)
+
+    if not rows and not traces:
+        what = []
+        if a.older_than is not None or not (a.orphaned or a.traces):
+            what.append(f"nothing older than {days} days")
+        if a.orphaned:
+            what.append("no session whose directory is gone")
+        if a.traces:
+            what.append("nothing left over from a deleted session")
+        print(f"{'; '.join(what)} in {', '.join(want)} ({kept} session(s) kept)")
         return 0
 
-    headers = ["WHEN", "PROFILE", "SESSION ID", "DIRECTORY"]
-    rows = []
-    for mtime, p, f, _ in doomed[:a.limit or len(doomed)]:
-        info = scan(f)
-        cwd = (info[0] if info else "?") or "?"
-        rows.append([age(mtime), p, C(os.path.basename(f)[:-6], "cy"),
-                     cwd.replace(HOME, "~")])
-    print(render_table(headers, rows, ["l", "l", "l", "l"], plain=a.plain, dim=D))
-    if a.limit and len(doomed) > a.limit:
-        print(D(f"...and {len(doomed) - a.limit} more (use -n 0 to list them all)"))
+    if rows:
+        mixed = len({tuple(r[4]) for r in rows}) > 1
+        headers = ["WHEN", "PROFILE", "SESSION ID", "SIZE", "DIRECTORY"]
+        aligns = ["l", "l", "l", "r", "l"]
+        if mixed:
+            headers.insert(3, "WHY")
+            aligns.insert(3, "l")
+        table = []
+        for mtime, prof, sid, cwd, why, _, size in rows[:a.limit or len(rows)]:
+            row = [age(mtime), prof, C(sid, "cy"), human(size),
+                   cwd.replace(HOME, "~")]
+            if mixed:
+                row.insert(3, "gone" if "gone" in why else "old")
+            table.append(row)
+        print(render_table(headers, table, aligns, plain=a.plain, dim=D))
+        if a.limit and len(rows) > a.limit:
+            print(D(f"...and {len(rows) - a.limit} more (use -n 0 to list them all)"))
 
-    print(f"\n{len(doomed)} session(s) older than {a.older_than} days, {human(freed)}"
-          f"  ({kept} newer session(s) untouched)")
+    if traces:
+        groups = {}
+        for prof, _, top, _, size in traces:
+            g = groups.setdefault((prof, top), [0, 0])
+            g[0] += 1
+            g[1] += size
+        print(render_table(
+            ["PROFILE", "WHERE", "FILES", "SIZE", "WHAT IT HELD"],
+            [[prof, top, str(n), human(b),
+              PART_LABELS.get(top, "named after a session")]
+             for (prof, top), (n, b) in sorted(groups.items())],
+            ["l", "l", "r", "r", "l"], plain=a.plain, dim=D))
+
+    bits = []
+    if rows:
+        bits.append(f"{len(rows)} session(s)")
+    if traces:
+        bits.append(f"{len(traces)} leftover file(s)")
+    print(f"\n{' and '.join(bits)}, {human(freed)}"
+          f"  ({kept} session(s) untouched)")
+
     if not a.yes:
         print(C("dry run - nothing deleted. pass --yes to delete.", "yl"))
         return 0
 
-    gone = 0
-    for _, _, f, _ in doomed:
-        try:
-            os.remove(f)
+    gone = swept = 0
+    for _, _, sid, _, _, parts, _ in rows:
+        err = delete_parts(parts)
+        if err:
+            print(f"could not delete {sid}: {err}", file=sys.stderr)
+        else:
             gone += 1
-        except OSError as e:
-            print(f"could not delete {f}: {e}", file=sys.stderr)
-    print(C(f"deleted {gone} session(s), freed {human(freed)}", "gr"))
-    return 0
+    for _, _, _, path, _ in traces:
+        err = delete_parts([path])
+        if err:
+            print(f"could not delete {path}: {err}", file=sys.stderr)
+        else:
+            swept += 1
+    done = []
+    if rows:
+        done.append(f"{gone} session(s)")
+    if traces:
+        done.append(f"{swept} leftover file(s)")
+    print(C(f"deleted {' and '.join(done)}, freed {human(freed)}", "gr"))
+    return 0 if gone == len(rows) and swept == len(traces) else 1
 
 
 def same_dir(a, b):
@@ -1531,79 +1630,10 @@ def delete_parts(parts):
     return None
 
 
-def clear_traces(a, C, D):
-    """Delete profile-level files named after sessions that are already gone."""
-    want = [a.profile] if a.profile else profile_names()
-    live = all_session_ids()
-    rows = []
-    for prof in want:
-        for path, sid, top in stranded_traces(prof, live):
-            size = dir_size(path) if os.path.isdir(path) else os.path.getsize(path)
-            rows.append((prof, sid, top, path, size))
-    if not rows:
-        print("nothing left over from a deleted session"
-              f" (profiles: {', '.join(want)})")
-        return 0
-
-    freed = sum(r[4] for r in rows)
-    print(f"{len(rows)} file(s) named after sessions that no longer exist,"
-          f" {human(freed)}")
-    by_profile = {}
-    for prof, sid, top, _, size in rows:
-        by_profile.setdefault((prof, top), []).append((sid, size))
-    headers = ["PROFILE", "WHERE", "FILES", "SIZE", "WHAT IT HELD"]
-    table = []
-    for (prof, top), items in sorted(by_profile.items()):
-        table.append([prof, top, str(len(items)),
-                      human(sum(i[1] for i in items)),
-                      PART_LABELS.get(top, "named after a session")])
-    print(render_table(headers, table, ["l", "l", "r", "r", "l"],
-                       plain=a.plain, dim=D))
-
-    if a.dry_run:
-        print(C("\ndry run - nothing deleted", "yl"))
-        return 0
-    if not a.yes:
-        print(C("\nthis cannot be undone.", "yl"), end=" ")
-        try:
-            if input("type y to delete: ").strip().lower() not in ("y", "yes"):
-                print("nothing deleted")
-                return 0
-        except (EOFError, KeyboardInterrupt):
-            print("\nnothing deleted")
-            return 0
-
-    gone = 0
-    for _, _, _, path, _ in rows:
-        err = delete_parts([path])
-        if err:
-            print(f"could not delete {path}: {err}", file=sys.stderr)
-        else:
-            gone += 1
-    print(C(f"deleted {gone} file(s), freed {human(freed)}", "gr"))
-    return 0 if gone == len(rows) else 1
-
-
 def cmd_clear(a):
     """List one directory's sessions across every profile and delete the chosen ones."""
     C = color()
     D = lambda t: C(t, "dim")          # noqa: E731
-
-    if a.traces:
-        if a.path:
-            print("--traces sweeps whole profiles - it takes no path",
-                  file=sys.stderr)
-            return 2
-        if a.profile:
-            try:
-                check_name(a.profile)
-            except BadProfileName as e:
-                print(str(e), file=sys.stderr)
-                return 1
-            if a.profile not in profile_names():
-                print(f"no such profile: {a.profile}", file=sys.stderr)
-                return 1
-        return clear_traces(a, C, D)
 
     raw = a.path or os.getcwd()
     target = os.path.realpath(os.path.expanduser(raw))
@@ -2207,7 +2237,7 @@ def cmd_doctor(a):
             wheres = sorted({top for _, _, top in traces})
             warn(f"{n}: {len(traces)} file(s) named after deleted sessions"
                  f" in {', '.join(wheres)} ({human(bulk)}) - "
-                 "delete them with 'claude-profiles clear --traces'")
+                 "delete them with 'claude-prune --traces'")
     if not found:
         ok("nothing is left over from a deleted session")
 
@@ -2282,9 +2312,14 @@ def main():
                    help="only report, do not pull")
     p.set_defaults(fn=cmd_update)
 
-    p = sub.add_parser("prune", help="delete old conversation transcripts")
-    p.add_argument("-o", "--older-than", type=int, default=90, metavar="DAYS",
-                   help="age threshold in days (default 90)")
+    p = sub.add_parser("prune", help="delete sessions you no longer need")
+    p.add_argument("-o", "--older-than", type=int, default=None, metavar="DAYS",
+                   help="age threshold in days (default 90, and the default"
+                        " selector when no other is given)")
+    p.add_argument("--orphaned", action="store_true",
+                   help="also sessions whose working directory no longer exists")
+    p.add_argument("--traces", action="store_true",
+                   help="also files left behind by sessions already deleted")
     p.add_argument("-p", "--profile", help="just this profile (default: all)")
     p.add_argument("-n", "--limit", type=int, default=20,
                    help="rows to list (0 for all)")
@@ -2307,9 +2342,6 @@ def main():
                    help="show what would go, delete nothing")
     p.add_argument("-y", "--yes", action="store_true",
                    help="skip the confirmation")
-    p.add_argument("--traces", action="store_true",
-                   help="instead, sweep files left behind by sessions that are"
-                        " already deleted (takes no path)")
     p.add_argument("--plain", action="store_true")
     p.set_defaults(fn=cmd_clear)
 
