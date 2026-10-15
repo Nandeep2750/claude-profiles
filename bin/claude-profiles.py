@@ -993,7 +993,8 @@ def stranded_traces(pname, live=None):
         for name in names:
             stem = name.split(".", 1)[0]
             gone = ((FULL_ID.match(stem) and stem not in live)
-                    or (SHORT_ID.match(stem) and stem not in shorts))
+                    or (top in SHORT_ID_DIRS and SHORT_ID.match(stem)
+                        and stem not in shorts))
             if gone:
                 out.append((os.path.join(tdir, name), stem, top))
     return out
@@ -1398,8 +1399,13 @@ def is_under(child, parent):
 
 SHORT_ID = re.compile(r"^[0-9a-f]{8}$")
 
+# The only directory Claude Code keys by a shortened id. Eight hex characters
+# is a common enough name that matching it anywhere would risk deleting
+# something that has nothing to do with a session.
+SHORT_ID_DIRS = ("jobs",)
 
-def session_traces(pdir, sid):
+
+def session_traces(pdir, sid, others=()):
     """Anything elsewhere in the profile that is named after one session.
 
     Claude Code and its plugins key several profile-level directories by
@@ -1408,10 +1414,13 @@ def session_traces(pdir, sid):
     session-env/<id>/, tasks/<id>/ and a plugin's <id>.mode all follow the
     same shape. Deleting only the transcript leaves that content readable.
 
-    Only exact names count: <id>, <id>.<ext>, or the 8-character prefix that
-    jobs/ uses. A name that merely contains the id is left alone.
+    Only exact names count: <id>, <id>.<ext>, or - inside jobs/ alone - the
+    8-character prefix it uses. A name that merely contains the id is left
+    alone, and the short prefix is ignored when another session shares it, so
+    deleting one session can never take another's files.
     """
     short = sid[:8]
+    shared = any(o != sid and o.startswith(short) for o in others)
     found = []
     try:
         tops = sorted(os.listdir(pdir))
@@ -1429,7 +1438,10 @@ def session_traces(pdir, sid):
             continue
         for name in names:
             stem = name.split(".", 1)[0]
-            if name == sid or stem == sid or (stem == short and SHORT_ID.match(stem)):
+            mine = (name == sid or stem == sid)
+            if not mine and top in SHORT_ID_DIRS and not shared:
+                mine = stem == short and bool(SHORT_ID.match(stem))
+            if mine:
                 found.append(os.path.join(tdir, name))
     return found
 
@@ -1639,7 +1651,8 @@ def cmd_clear(a):
             else:
                 continue
             sid = os.path.basename(f)[:-6]
-            parts = session_parts(f) + session_traces(profile_dir(prof), sid)
+            parts = session_parts(f) + session_traces(profile_dir(prof), sid,
+                                                      live_session_ids(prof))
             found.append((info[3], prof, sid, info[2],
                           info[4], where, parts, parts_size(parts)))
     found.sort(reverse=True)

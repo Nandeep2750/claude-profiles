@@ -16,7 +16,10 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   job's state and timeline. Clearing a session now removes anything in the
   profile named exactly `<session-id>` or `<session-id>.*`, plus the
   8-character prefix `jobs/` uses. `memory/` is still kept, and a name that
-  merely contains the id is never touched.
+  merely contains the id is never touched. The short-prefix rule applies to
+  `jobs/` alone, and is skipped when two sessions share those eight
+  characters, so clearing some of a project's sessions cannot reach the ones
+  you kept.
 - The confirmation list now says what each file held
   (`copies of the files it edited`) instead of labelling every directory
   `side files`.

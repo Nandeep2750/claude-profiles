@@ -457,6 +457,158 @@ class TestShellParity(unittest.TestCase):
                 self.assertIn(cmd, text, f"{name} has no {cmd}")
 
 
+class TestPartialDelete(Fixture):
+    """Delete some of a project's sessions and the rest must be untouched -
+    transcript, side files, and every profile-level folder named after them."""
+
+    IDS = [f"{n}{'a' * 7}-0000-0000-0000-000000000000" for n in range(1, 9)]
+
+    def setUp(self):
+        super().setUp()
+        self.proj = os.path.join(self.home, "code", "api")
+        os.makedirs(self.proj, exist_ok=True)
+        self.enc = encode_dir(self.proj)
+        self.wdir = os.path.join(self.ph, "work")
+        self.pdir = os.path.join(self.wdir, "projects", self.enc)
+        for i, sid in enumerate(self.IDS, 1):
+            transcript(os.path.join(self.pdir, sid + ".jsonl"), self.proj,
+                       [f"session {i}"])
+            self.belongings(sid, f"body of {sid}")
+
+    def belongings(self, sid, body):
+        """Everything on disk that one session owns."""
+        made = []
+        side = os.path.join(self.pdir, sid, "tool-results")
+        os.makedirs(side, exist_ok=True)
+        with open(os.path.join(side, "r1.txt"), "w") as fh:
+            fh.write(body)
+        made.append(os.path.join(side, "r1.txt"))
+        for top, name in (("file-history", sid), ("session-env", sid),
+                          ("tasks", sid), ("jobs", sid[:8])):
+            d = os.path.join(self.wdir, top, name)
+            os.makedirs(d, exist_ok=True)
+            with open(os.path.join(d, "v1"), "w") as fh:
+                fh.write(body)
+            made.append(os.path.join(d, "v1"))
+        mode = os.path.join(self.wdir, ".caveman-sessions", sid + ".mode")
+        os.makedirs(os.path.dirname(mode), exist_ok=True)
+        with open(mode, "w") as fh:
+            fh.write(body)
+        made.append(mode)
+        return made
+
+    def owns(self, sid):
+        return ([os.path.join(self.pdir, sid + ".jsonl"),
+                 os.path.join(self.pdir, sid, "tool-results", "r1.txt")]
+                + [os.path.join(self.wdir, t, n, "v1")
+                   for t, n in (("file-history", sid), ("session-env", sid),
+                                ("tasks", sid), ("jobs", sid[:8]))]
+                + [os.path.join(self.wdir, ".caveman-sessions", sid + ".mode")])
+
+    def delete(self, *sids):
+        args = ["clear", self.proj, "-p", "work", "--yes", "--plain"]
+        for sid in sids:
+            args += ["-s", sid]
+        code, out, err = self.run_cmd(*args)
+        self.assertEqual(code, 0, err)
+        return out
+
+    def assert_gone(self, sid):
+        for path in self.owns(sid):
+            self.assertFalse(os.path.exists(path), f"{sid} left behind {path}")
+
+    def assert_intact(self, sid):
+        for path in self.owns(sid):
+            self.assertTrue(os.path.exists(path), f"{sid} lost {path}")
+        with open(os.path.join(self.pdir, sid, "tool-results", "r1.txt")) as fh:
+            self.assertEqual(fh.read(), f"body of {sid}")
+
+    def test_all_eight_start_complete(self):
+        for sid in self.IDS:
+            self.assert_intact(sid)
+
+    def test_deleting_four_leaves_the_other_four(self):
+        doomed, kept = self.IDS[:4], self.IDS[4:]
+        self.delete(*doomed)
+        for sid in doomed:
+            self.assert_gone(sid)
+        for sid in kept:
+            self.assert_intact(sid)
+
+    def test_deleting_one_leaves_seven(self):
+        self.delete(self.IDS[3])
+        self.assert_gone(self.IDS[3])
+        for sid in self.IDS[:3] + self.IDS[4:]:
+            self.assert_intact(sid)
+
+    def test_the_project_directory_survives_a_partial_delete(self):
+        self.delete(*self.IDS[:4])
+        self.assertTrue(os.path.isdir(self.pdir),
+                        "the remaining sessions still live here")
+
+    def test_the_shared_folders_survive_a_partial_delete(self):
+        self.delete(*self.IDS[:4])
+        for top in ("file-history", "session-env", "tasks", "jobs",
+                    ".caveman-sessions"):
+            self.assertTrue(os.path.isdir(os.path.join(self.wdir, top)),
+                            f"{top} itself was removed")
+
+    def test_the_projects_memory_survives_a_partial_delete(self):
+        mem = os.path.join(self.pdir, "memory")
+        os.makedirs(mem, exist_ok=True)
+        with open(os.path.join(mem, "MEMORY.md"), "w") as fh:
+            fh.write("- [a](a.md)\n")
+        self.delete(*self.IDS[:4])
+        self.assertTrue(os.path.isfile(os.path.join(mem, "MEMORY.md")))
+
+    def test_sessions_listing_shows_exactly_the_four_that_are_left(self):
+        self.delete(*self.IDS[:4])
+        _, out, _ = self.run_cmd("sessions", "-p", "work", "-d", self.proj,
+                                 "--plain")
+        for sid in self.IDS[:4]:
+            self.assertNotIn(sid[:8], out)
+        for sid in self.IDS[4:]:
+            self.assertIn(sid[:8], out)
+
+    def test_doctor_reports_nothing_stranded_afterwards(self):
+        self.delete(*self.IDS[:4])
+        _, out, _ = self.run_cmd("doctor")
+        self.assertIn("nothing is left over", out)
+
+    def test_a_traces_sweep_afterwards_removes_nothing_more(self):
+        self.delete(*self.IDS[:4])
+        code, out, _ = self.run_cmd("clear", "--traces", "--yes", "--plain")
+        self.assertEqual(code, 0)
+        self.assertIn("nothing left over", out)
+        for sid in self.IDS[4:]:
+            self.assert_intact(sid)
+
+    def test_a_shared_short_prefix_never_takes_the_other_sessions_job(self):
+        # two sessions whose ids begin with the same eight characters
+        twin_a = "cccccccc-0000-0000-0000-00000000000a"
+        twin_b = "cccccccc-0000-0000-0000-00000000000b"
+        for sid in (twin_a, twin_b):
+            transcript(os.path.join(self.pdir, sid + ".jsonl"), self.proj, ["x"])
+        job = os.path.join(self.wdir, "jobs", "cccccccc")
+        os.makedirs(job, exist_ok=True)
+        with open(os.path.join(job, "state.json"), "w") as fh:
+            fh.write("{}")
+        self.delete(twin_a)
+        self.assertFalse(os.path.exists(os.path.join(self.pdir, twin_a + ".jsonl")))
+        self.assertTrue(os.path.isfile(os.path.join(job, "state.json")),
+                        "the surviving twin still needs that job")
+        self.assertTrue(os.path.isfile(os.path.join(self.pdir, twin_b + ".jsonl")))
+
+    def test_an_eight_hex_name_outside_jobs_is_not_a_session(self):
+        cache = os.path.join(self.wdir, "cache", self.IDS[0][:8])
+        os.makedirs(cache, exist_ok=True)
+        with open(os.path.join(cache, "blob"), "w") as fh:
+            fh.write("unrelated")
+        self.delete(self.IDS[0])
+        self.assertTrue(os.path.isfile(os.path.join(cache, "blob")),
+                        "only jobs/ keys by a short id")
+
+
 class TestPickParsing(Fixture):
     """The number picker. Anything it misreads deletes the wrong session."""
 

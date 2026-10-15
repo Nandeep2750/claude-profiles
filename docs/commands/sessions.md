@@ -380,8 +380,15 @@ session id, and some of them hold real content.
 | `tasks/<session-id>/` | its task state |
 | anything else named `<session-id>` or `<session-id>.*` | plugin notes and the like |
 
-Only exact names count. A folder that merely contains the id, and another
-session's files, are never touched.
+Only exact names count, so deleting some of a project's sessions never
+disturbs the rest. A folder whose name merely contains the id is not matched,
+nor is another session's. `jobs/` is the one place Claude Code uses a
+shortened id, and that eight-character rule applies there alone - and is
+skipped altogether when two sessions happen to begin with the same eight
+characters, so the survivor keeps its job.
+
+The shared folders themselves stay: `projects/<dir>/`, `file-history/`,
+`jobs/` and the rest are left in place for the sessions still using them.
 
 | Kept | Why |
 |---|---|
