@@ -93,6 +93,25 @@ endpoint is simply busy.
 
 ---
 
+## `claude-version`
+
+Prints the installed version and nothing else, so it is easy to use in a
+script or a bug report.
+
+```sh
+claude-version
+```
+
+```
+2.3.0 (v2.3.0-2-g4a5eb26)
+```
+
+The part in brackets is the git description of your checkout, which tells you
+how far past the last tag you are. `claude-profiles --version` prints the same
+thing, and `claude-update --check` compares it with the latest release.
+
+---
+
 ## `claude-update`
 
 Check for and pull a newer version. Covered in full on the

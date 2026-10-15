@@ -178,3 +178,24 @@ that does not exist.
 ## `NO_COLOR`
 
 Honoured by every command. Output is also uncoloured automatically when piped.
+
+## Overrides you rarely need
+
+The shell layer works these out for itself. Set one only when the guess is
+wrong on your machine, before the `source` line in your rc file.
+
+| Variable | What it points at | Default |
+|---|---|---|
+| `CLAUDE_TOOLS_DIR` | where this tool is installed | derived from the sourced file's own path |
+| `CLAUDE_PROFILE_PY` | the core script | `$CLAUDE_TOOLS_DIR/bin/claude-profiles.py` |
+| `CLAUDE_PY` | the Python to run it with | `python3`, else `python`, whichever is on `PATH` |
+
+The usual reason is a machine where Python is installed under another name, or
+a pinned interpreter:
+
+```sh
+export CLAUDE_PY=/usr/local/bin/python3.12
+source "$HOME/.claude-tools/shell/claude-profiles.zsh"
+```
+
+`claude-doctor` reports which Python it found, so check there first.

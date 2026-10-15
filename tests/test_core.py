@@ -442,6 +442,35 @@ class TestShellParity(unittest.TestCase):
             with open(os.path.join(self.repo, "shell", name)) as fh:
                 self.assertIn(needle, fh.read(), name)
 
+    def docs_text(self):
+        import glob
+        return "\n".join(open(f).read() for f in
+                         sorted(glob.glob(os.path.join(self.repo, "docs", "**", "*.md"),
+                                          recursive=True)))
+
+    def test_every_subcommand_is_documented(self):
+        missing = [s for s in self.core_subcommands() if s not in self.docs_text()]
+        self.assertEqual(missing, [], f"undocumented subcommands: {missing}")
+
+    def test_every_shell_command_is_documented(self):
+        with open(os.path.join(self.repo, "shell", "claude-profiles.zsh")) as fh:
+            names = sorted(set(re.findall(r"^(claude[-_][a-z-]+)\(\)", fh.read(), re.M)))
+        self.assertGreater(len(names), 10)
+        docs = self.docs_text()
+        missing = [n for n in names if n not in docs]
+        self.assertEqual(missing, [], f"undocumented commands: {missing}")
+
+    def test_every_environment_variable_is_documented(self):
+        texts = []
+        for name in ("bin/claude-profiles.py", "shell/claude-profiles.zsh"):
+            with open(os.path.join(self.repo, name)) as fh:
+                texts.append(fh.read())
+        names = set(re.findall(r'environ\.get\("(CLAUDE_[A-Z_]+)"', texts[0]))
+        names |= set(re.findall(r"\$\{?(CLAUDE_[A-Z_]+)", texts[1]))
+        docs = self.docs_text()
+        missing = sorted(n for n in names if n not in docs)
+        self.assertEqual(missing, [], f"undocumented settings: {missing}")
+
     def test_every_documented_command_exists_in_all_three_layers(self):
         """The docs promise the same claude-* names everywhere."""
         layers = {}
