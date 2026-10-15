@@ -128,9 +128,12 @@ jobs:
           if ($out -notmatch 'no sessions recorded') { throw "clear on an empty dir said: $out" }
           Write-Host 'ok  claude-clear'
 
+          # doctor exits 1 on a bare runner (no rc wiring), which is correct.
+          # Every check above throws on failure, so end the step deliberately.
           $out = claude-doctor 2>&1 | Out-String
           if ($out -notmatch 'environment') { throw "doctor produced no report" }
           Write-Host 'ok  claude-doctor'
+          exit 0
 
       - name: Core runs on Windows
         shell: pwsh
