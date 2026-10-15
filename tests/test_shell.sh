@@ -26,12 +26,21 @@ unset CLAUDE_CONFIG_DIR CLAUDE_PROFILE_NAME CLAUDE_DEFAULT_PROFILE \
       CLAUDE_PROFILE_PROMPT_PREFIX 2>/dev/null || true
 
 printf 'shell layer (%s)\n' "$SH_NAME"
+
+# Parse the file before using it. A syntax error part way down still leaves the
+# functions above it defined, so every later check can pass while the layer is
+# broken for real users.
+if "$SH_NAME" -n "$LAYER" 2>/dev/null; then ok "$SH_NAME parses the layer"
+else bad "$SH_NAME parses the layer" "no syntax errors" "$("$SH_NAME" -n "$LAYER" 2>&1 | head -1)"; fi
+
 # shellcheck disable=SC1090
-. "$LAYER"
+if . "$LAYER"; then ok "sourcing the layer succeeds"
+else bad "sourcing the layer succeeds" "exit 0" "exit $?"; fi
 
 for fn in claude-profile claude-profiles claude-sessions claude-handoff \
           claude-profile-remove claude-doctor claude-profile-exec \
           claude-profile-clone claude_profile_prompt claude-prune \
+          claude-clear claude-path claude-statusline \
           claude-best claude-auto claude-update claude-version; do
   if command -v "$fn" >/dev/null 2>&1; then ok "$fn is defined"; else bad "$fn is defined" "defined" "missing"; fi
 done

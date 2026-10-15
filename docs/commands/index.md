@@ -102,13 +102,35 @@ scripts, or on a shell with no wrapper installed.
 | `claude-prune` | `claude-profiles.py prune` |
 | `claude-best` | `claude-profiles.py best` |
 | `claude-update` | `claude-profiles.py update` |
-| `claude-auto` | *(shell only)* |
-| - | `claude-profiles.py path NAME` |
+| `claude-auto` | *(wrapper only)* |
+| `claude-path` | `claude-profiles.py path NAME` |
+| `claude-statusline` | `claude-profiles.py statusline` |
 
-PowerShell users get the same names as aliases, plus verb-noun forms
-(`Set-ClaudeProfile`, `Get-ClaudeProfiles`, `Get-ClaudeSessions`,
-`Move-ClaudeSession`, `Remove-ClaudeProfile`, `Test-ClaudeProfiles`,
-`Copy-ClaudeProfile`, `Invoke-ClaudeProfile`).
+PowerShell users get the same `claude-*` names as aliases, plus verb-noun
+forms:
+
+| Alias | PowerShell function |
+|---|---|
+| `claude-profile` | `Set-ClaudeProfile` |
+| `claude-profiles` | `Get-ClaudeProfiles` |
+| `claude-sessions` | `Get-ClaudeSessions` |
+| `claude-handoff` | `Move-ClaudeSession` |
+| `claude-clear` | `Remove-ClaudeSessions` |
+| `claude-prune` | `Clear-ClaudeSessions` |
+| `claude-profile-remove` | `Remove-ClaudeProfile` |
+| `claude-profile-clone` | `Copy-ClaudeProfile` |
+| `claude-profile-exec` | `Invoke-ClaudeProfile` |
+| `claude-doctor` | `Test-ClaudeProfiles` |
+| `claude-best` | `Find-ClaudeProfile` |
+| `claude-update` | `Update-ClaudeProfiles` |
+| `claude-path` | `Get-ClaudeProfilePath` |
+| `claude-statusline` | `Set-ClaudeStatusLine` |
+
+| `claude-auto` | `Start-ClaudeAuto` |
+
+Only `claude-profile-exec` and `claude-auto` have no single core subcommand
+behind them: they set the environment for a child process, which is the shell
+layer's job rather than the core's.
 
 ---
 

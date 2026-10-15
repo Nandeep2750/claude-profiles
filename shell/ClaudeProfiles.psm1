@@ -27,7 +27,18 @@ function Set-ClaudeProfile {
     }
 }
 
-function Get-ClaudeProfiles { & $script:Py $script:Core status @args }
+# `claude-profiles` with no subcommand means `status`; a known subcommand goes
+# straight through. Keep this list in step with the core - tests/test_core.py
+# checks it against the core's own subcommands.
+$script:Subcommands = @('clear','clone','best','doctor','handoff','path','prune',
+                        'remove','sessions','status','statusline','update')
+function Get-ClaudeProfiles {
+    if ($args.Count -gt 0 -and $script:Subcommands -contains [string]$args[0]) {
+        & $script:Py $script:Core @args
+    } else {
+        & $script:Py $script:Core status @args
+    }
+}
 function Get-ClaudeSessions { & $script:Py $script:Core sessions @args }
 function Move-ClaudeSession { & $script:Py $script:Core handoff  @args }
 
@@ -37,6 +48,23 @@ function Clear-ClaudeSessions { & $script:Py $script:Core prune  @args }
 function Remove-ClaudeSessions { & $script:Py $script:Core clear  @args }
 function Find-ClaudeProfile   { & $script:Py $script:Core best   @args }
 function Update-ClaudeProfiles { & $script:Py $script:Core update @args }
+function Get-ClaudeProfilePath { & $script:Py $script:Core path @args }
+
+function Start-ClaudeAuto {
+    if ($args.Count -gt 0 -and ($args[0] -eq '-h' -or $args[0] -eq '--help')) {
+        Write-Host "usage: claude-auto [CLAUDE ARGS...]"
+        Write-Host ""
+        Write-Host "Launch Claude on whichever signed-in account has the most headroom."
+        Write-Host "Anything you pass is handed to claude itself."
+        return
+    }
+    $pick = & $script:Py $script:Core best --quiet
+    if ($LASTEXITCODE -ne 0) { return }
+    if (-not $pick) { Write-Error "no signed-in profile with headroom"; return }
+    Write-Host "using profile $pick"
+    Invoke-ClaudeProfile -Name $pick -Command (@('claude') + $args)
+}
+function Set-ClaudeStatusLine  { & $script:Py $script:Core statusline @args }
 
 function Invoke-ClaudeProfile {
     [CmdletBinding()] param(
@@ -55,7 +83,9 @@ function Invoke-ClaudeProfile {
             if (-not (Test-Path $dir)) { Write-Error "no such profile: $Name"; return }
             $env:CLAUDE_CONFIG_DIR = $dir; $env:CLAUDE_PROFILE_NAME = $Name
         }
-        & $Command[0] @($Command[1..($Command.Count-1)])
+        $exe  = $Command[0]
+        $rest = @(if ($Command.Count -gt 1) { $Command[1..($Command.Count - 1)] })
+        & $exe @rest
     } finally {
         if ($prevDir)  { $env:CLAUDE_CONFIG_DIR = $prevDir }   else { Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue }
         if ($prevName) { $env:CLAUDE_PROFILE_NAME = $prevName } else { Remove-Item Env:CLAUDE_PROFILE_NAME -ErrorAction SilentlyContinue }
@@ -95,6 +125,9 @@ Set-Alias claude-prune    Clear-ClaudeSessions
 Set-Alias claude-clear    Remove-ClaudeSessions
 Set-Alias claude-best     Find-ClaudeProfile
 Set-Alias claude-update   Update-ClaudeProfiles
+Set-Alias claude-path     Get-ClaudeProfilePath
+Set-Alias claude-statusline Set-ClaudeStatusLine
+Set-Alias claude-auto     Start-ClaudeAuto
 
 Register-ArgumentCompleter -CommandName Set-ClaudeProfile -ParameterName Name -ScriptBlock {
     param($c,$p,$word)

@@ -1308,6 +1308,38 @@ def cmd_prune(a):
     return 0
 
 
+def same_dir(a, b):
+    """Is this the same directory, as the filesystem sees it?
+
+    os.path.samefile is the authority on all three platforms - it compares the
+    device and inode, so it gets Windows and macOS right where those treat
+    'Proj' and 'proj' as one directory and a plain string compare would not.
+    It needs both paths to exist, and a cleared project's directory often does
+    not, so fall back to the platform's own case rule.
+    """
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        if IS_WINDOWS:
+            return os.path.normcase(a) == os.path.normcase(b)
+        if IS_MAC:
+            return a.casefold() == b.casefold()
+        return a == b
+
+
+def is_under(child, parent):
+    """Is child inside parent? Walks up, so it is case-correct per platform."""
+    seen = child
+    for _ in range(64):
+        nxt = os.path.dirname(seen)
+        if nxt == seen:
+            return False
+        seen = nxt
+        if same_dir(seen, parent):
+            return True
+    return False
+
+
 def session_parts(f):
     """Everything on disk that belongs to one session.
 
@@ -1406,10 +1438,10 @@ def cmd_clear(a):
             if not cwd:
                 continue
             here = os.path.realpath(cwd)
-            if here == target:
+            if same_dir(here, target):
                 where = ""
-            elif a.under and here.startswith(target + os.sep):
-                where = here[len(target) + 1:]
+            elif a.under and is_under(here, target):
+                where = os.path.relpath(here, target)
             else:
                 continue
             parts = session_parts(f)

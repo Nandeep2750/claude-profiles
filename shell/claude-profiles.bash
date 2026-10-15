@@ -58,6 +58,8 @@ claude-doctor()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" doctor "$@"; }
 claude-profile-clone() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clone "$@"; }
 claude-prune()    { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" prune "$@"; }
 claude-clear()    { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clear "$@"; }
+claude-path()     { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" path "$@"; }
+claude-statusline() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" statusline "$@"; }
 claude-best()     { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" best  "$@"; }
 claude-update()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" update "$@"; }
 claude-version()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" --version; }
@@ -156,6 +158,7 @@ complete -F _claude_profile_complete claude-profile
 complete -F _claude_profile_complete claude-profile-remove
 complete -F _claude_profile_complete claude-profile-exec
 complete -F _claude_profile_complete claude-profile-clone
+complete -F _claude_profile_complete claude-path
 complete -W "-m --with-memory --force-memory -n --dry-run -f --force --move --copy -s --source -d --dir" claude-handoff
 complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir --plain -g --grep" claude-sessions
 complete -W "-o --older-than -p --profile -n --limit -y --yes --plain" claude-prune

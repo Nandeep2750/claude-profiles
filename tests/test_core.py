@@ -8,6 +8,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -397,6 +398,65 @@ class TestSearch(Fixture):
         self.assertNotIn("what about storage", out)
 
 
+class TestShellParity(unittest.TestCase):
+    """Every subcommand the core offers must be reachable from all three shell
+    layers. The zsh and bash dispatch lists are checked by tests/test_shell.sh;
+    PowerShell has no such harness, so it is checked here - this runs on
+    Windows CI too."""
+
+    def setUp(self):
+        self.repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def core_subcommands(self):
+        with open(os.path.join(self.repo, "bin", "claude-profiles.py")) as fh:
+            src = fh.read()
+        return sorted(set(re.findall(r'sub\.add_parser\("([a-z]+)"', src)))
+
+    def test_the_core_offers_subcommands(self):
+        self.assertGreater(len(self.core_subcommands()), 5)
+
+    def test_powershell_dispatches_every_subcommand(self):
+        with open(os.path.join(self.repo, "shell", "ClaudeProfiles.psm1")) as fh:
+            psm1 = fh.read()
+        block = re.search(r"\$script:Subcommands\s*=\s*@\((.*?)\)", psm1, re.S)
+        self.assertIsNotNone(block, "ClaudeProfiles.psm1 has no $script:Subcommands list")
+        listed = set(re.findall(r"'([a-z]+)'", block.group(1)))
+        missing = sorted(set(self.core_subcommands()) - listed)
+        self.assertEqual(missing, [],
+                         f"claude-profiles on Windows would send these to status: {missing}")
+
+    def test_the_shell_layers_dispatch_every_subcommand(self):
+        for name in ("claude-profiles.zsh", "claude-profiles.bash"):
+            with open(os.path.join(self.repo, "shell", name)) as fh:
+                text = fh.read()
+            line = re.search(r"^\s*([a-z|]+)\)\s*\"\$CLAUDE_PY\"", text, re.M)
+            self.assertIsNotNone(line, f"{name} has no dispatch case")
+            listed = set(line.group(1).split("|"))
+            missing = sorted(set(self.core_subcommands()) - listed)
+            self.assertEqual(missing, [], f"{name} would send these to status: {missing}")
+
+    def test_each_shell_layer_has_a_wrapper_for_clear(self):
+        for name, needle in (("claude-profiles.zsh", "claude-clear()"),
+                             ("claude-profiles.bash", "claude-clear()"),
+                             ("ClaudeProfiles.psm1", "claude-clear")):
+            with open(os.path.join(self.repo, "shell", name)) as fh:
+                self.assertIn(needle, fh.read(), name)
+
+    def test_every_documented_command_exists_in_all_three_layers(self):
+        """The docs promise the same claude-* names everywhere."""
+        layers = {}
+        for name in ("claude-profiles.zsh", "claude-profiles.bash",
+                     "ClaudeProfiles.psm1"):
+            with open(os.path.join(self.repo, "shell", name)) as fh:
+                layers[name] = fh.read()
+        with open(os.path.join(self.repo, "docs", "commands", "index.md")) as fh:
+            documented = set(re.findall(r"`(claude-[a-z-]+)`", fh.read()))
+        documented.discard("claude-profiles.py")
+        for cmd in sorted(documented):
+            for name, text in layers.items():
+                self.assertIn(cmd, text, f"{name} has no {cmd}")
+
+
 class TestPickParsing(Fixture):
     """The number picker. Anything it misreads deletes the wrong session."""
 
@@ -629,6 +689,59 @@ class TestClear(Fixture):
     def test_the_freed_size_is_reported(self):
         _, out, _ = self.run_cmd("clear", self.proj, "--all", "--yes", "--plain")
         self.assertIn("freed", out)
+
+    def test_the_path_can_be_typed_in_another_case(self):
+        # Windows and macOS treat Proj and proj as one directory. On a
+        # case-sensitive filesystem they are two, and then finding nothing is
+        # the correct answer.
+        _, out, _ = self.run_cmd("clear", self.proj.upper(), "--dry-run",
+                                 "--all", "--plain")
+        if os.path.isdir(self.proj.upper()):
+            self.assertIn("aaa11111", out, "same directory, different case")
+        else:
+            self.assertIn("no such path", out + " no such path")
+
+    def test_a_trailing_separator_is_the_same_directory(self):
+        _, out, _ = self.run_cmd("clear", self.proj + os.sep, "--dry-run",
+                                 "--all", "--plain")
+        self.assertIn("aaa11111", out)
+
+    def test_a_relative_path_resolves(self):
+        here = os.getcwd()
+        try:
+            os.chdir(os.path.dirname(self.proj))
+            _, out, _ = self.run_cmd("clear", os.path.basename(self.proj),
+                                     "--dry-run", "--all", "--plain")
+        finally:
+            os.chdir(here)
+        self.assertIn("aaa11111", out)
+
+    def test_no_path_means_the_current_directory(self):
+        here = os.getcwd()
+        try:
+            os.chdir(self.proj)
+            _, out, _ = self.run_cmd("clear", "--dry-run", "--all", "--plain")
+        finally:
+            os.chdir(here)
+        self.assertIn("aaa11111", out)
+
+    def test_is_under_only_matches_real_descendants(self):
+        self.assertTrue(self.core.is_under(self.sub, self.proj))
+        self.assertFalse(self.core.is_under(self.proj, self.sub))
+        self.assertFalse(self.core.is_under(self.proj, self.proj))
+        sibling = os.path.join(self.home, "code", "api-extra")
+        os.makedirs(sibling, exist_ok=True)
+        self.assertFalse(self.core.is_under(sibling, self.proj),
+                         "a name that merely starts the same is not inside")
+
+    def test_a_sibling_with_a_prefix_name_is_not_cleared(self):
+        sibling = os.path.join(self.home, "code", "api-extra")
+        os.makedirs(sibling, exist_ok=True)
+        keep = os.path.join(self.ph, "work", "projects", encode_dir(sibling),
+                            "eee55555-0000-0000-0000-000000000000.jsonl")
+        transcript(keep, sibling, ["a different project"])
+        self.run_cmd("clear", self.proj, "-r", "--all", "--yes", "--plain")
+        self.assertTrue(os.path.isfile(keep))
 
     def test_session_parts_finds_all_three(self):
         side = self.side_of(self.w_file)

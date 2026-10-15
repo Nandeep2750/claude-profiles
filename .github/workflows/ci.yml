@@ -73,15 +73,65 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+      - name: The module parses
+        shell: pwsh
+        run: |
+          # A syntax error part way down still leaves the functions above it
+          # defined, so every later check can pass while the module is broken.
+          $errs = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path ./shell/ClaudeProfiles.psm1), [ref]$null, [ref]$errs) | Out-Null
+          if ($errs) { $errs | ForEach-Object { Write-Host $_ }; throw "ClaudeProfiles.psm1 has parse errors" }
+          Write-Host "ok  parses"
+
       - name: Module imports and exports its commands
         shell: pwsh
         run: |
           Import-Module ./shell/ClaudeProfiles.psm1 -Force
           foreach ($c in 'Set-ClaudeProfile','Get-ClaudeProfiles','Get-ClaudeSessions',
-                         'Move-ClaudeSession','Remove-ClaudeProfile','Test-ClaudeProfiles') {
+                         'Move-ClaudeSession','Remove-ClaudeProfile','Test-ClaudeProfiles',
+                         'Copy-ClaudeProfile','Clear-ClaudeSessions','Remove-ClaudeSessions',
+                         'Find-ClaudeProfile','Update-ClaudeProfiles','Invoke-ClaudeProfile',
+                         'Get-ClaudeProfilePath','Set-ClaudeStatusLine') {
             if (-not (Get-Command $c -ErrorAction SilentlyContinue)) { throw "missing: $c" }
             Write-Host "ok  $c"
           }
+          # every documented claude-* name must resolve to something
+          foreach ($a in 'claude-profile','claude-profiles','claude-sessions','claude-handoff',
+                         'claude-profile-remove','claude-doctor','claude-profile-clone',
+                         'claude-profile-exec','claude-prune','claude-clear','claude-best',
+                         'claude-update','claude-path','claude-statusline') {
+            $r = Get-Alias $a -ErrorAction SilentlyContinue
+            if (-not $r) { throw "missing alias: $a" }
+            Write-Host "ok  $a -> $($r.ResolvedCommandName)"
+          }
+
+      - name: Commands actually run on Windows
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          Import-Module ./shell/ClaudeProfiles.psm1 -Force
+          $sand = Join-Path $env:RUNNER_TEMP 'cp-win'
+          New-Item -ItemType Directory -Force -Path $sand | Out-Null
+          $env:CLAUDE_PROFILE_HOME = Join-Path $sand '.claude-profiles'
+          New-Item -ItemType Directory -Force -Path $env:CLAUDE_PROFILE_HOME | Out-Null
+
+          # claude-profiles must dispatch, not fall through to status
+          $out = claude-profiles path default 2>&1 | Out-String
+          Write-Host $out
+          if ($out -match 'PROFILE') { throw "'path' fell through to status" }
+
+          # clear refuses a path that is not there, and says so for an empty one
+          $out = claude-clear (Join-Path $sand 'nope') 2>&1 | Out-String
+          if ($out -notmatch 'no such path') { throw "clear did not reject a missing path: $out" }
+          $out = claude-clear $sand --plain 2>&1 | Out-String
+          if ($out -notmatch 'no sessions recorded') { throw "clear on an empty dir said: $out" }
+          Write-Host 'ok  claude-clear'
+
+          $out = claude-doctor 2>&1 | Out-String
+          if ($out -notmatch 'environment') { throw "doctor produced no report" }
+          Write-Host 'ok  claude-doctor'
+
       - name: Core runs on Windows
         shell: pwsh
         run: |

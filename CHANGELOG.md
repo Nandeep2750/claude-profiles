@@ -24,6 +24,26 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Windows was missing commands the docs promised.** The PowerShell module had
+  no `path` or `statusline`, and `claude-profiles` sent every argument to
+  `status` instead of dispatching subcommands, so `claude-profiles clear` and
+  `claude-profiles statusline` did the wrong thing. It now dispatches the same
+  list bash and zsh do, and gained `Get-ClaudeProfilePath`,
+  `Set-ClaudeStatusLine` and `Start-ClaudeAuto` (`claude-auto`).
+- **`claude-profile-exec NAME CMD` with no arguments ran the wrong thing on
+  Windows.** PowerShell counts `1..0` downwards, so a one-element command list
+  was passed as its own argument.
+- `claude-path` and `claude-statusline` now exist in all three shells, not just
+  PowerShell. A test checks every documented `claude-*` name against all three
+  layers.
+- `claude-clear` matches a project path the way the filesystem does, so a path
+  typed in a different case finds its sessions on Windows and macOS without
+  ever merging two genuinely different directories on a case-sensitive one.
+- Shell-layer tests now parse each layer before using it. A syntax error part
+  way down a file still leaves the functions above it defined, so the old tests
+  could pass while `source` was failing - which is how a broken zsh completion
+  reached CI.
+
 - **`claude-prune` could delete a live session's side files.** It listed every
   `.jsonl` under `projects/`, which includes the subagent transcripts and
   workflow journals Claude Code writes inside `<session-id>/`. On real data that

@@ -56,6 +56,8 @@ claude-clear()    { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clear "$@" }
 claude-best()     { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" best  "$@" }
 claude-update()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" update "$@" }
 claude-version()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" --version }
+claude-path()     { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" path "$@" }
+claude-statusline() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" statusline "$@" }
 
 # Launch claude on whichever signed-in account has the most headroom.
 claude-auto() {
@@ -208,6 +210,7 @@ _claude_clear() {
     '--plain[no borders]'
 }
 compdef _claude_clear claude-clear
+compdef _claude_profile_names claude-path
 
 _claude_profiles() {
   if (( CURRENT == 2 )) && [[ "$words[2]" != -* ]]; then
@@ -215,7 +218,7 @@ _claude_profiles() {
     subs=(status:'profiles, accounts and usage' doctor:'check the install for problems'
           sessions:'list conversations' handoff:'copy a session to another profile'
           remove:'delete a profile' clone:'copy settings between profiles'
-          prune:'delete old transcripts' clear:'delete one directory\'s sessions'
+          prune:'delete old transcripts' clear:'delete sessions for one directory'
           best:'which account has the most headroom'
           update:'check for and pull a newer version'
           path:'print a profile config dir')
