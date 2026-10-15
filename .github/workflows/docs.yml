@@ -26,7 +26,11 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-docs.txt
       - run: pip install -r requirements-docs.txt
+      # mkdocs-redirects 1.2.3 pulls in properdocs, which prints an
+      # advertisement for itself on every build. This silences it.
       - run: mkdocs build --strict
+        env:
+          DISABLE_MKDOCS_2_WARNING: 'true'
 
       # A page can exist and still be broken - a redirect stub serves HTTP 200
       # with no content. This refuses to deploy when that happens.
