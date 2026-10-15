@@ -580,6 +580,22 @@ class TestClear(Fixture):
         self.assertEqual(code, 1)
         self.assertIn("no such path", err)
 
+    def test_a_missing_relative_path_says_where_it_was_read_from(self):
+        here = os.getcwd()
+        try:
+            os.chdir(self.home)
+            code, _, err = self.run_cmd("clear", "code/nope")
+        finally:
+            os.chdir(here)
+        self.assertEqual(code, 1)
+        self.assertIn("relative path", err)
+        self.assertIn(self.home, err)
+
+    def test_a_tilde_the_shell_left_alone_is_expanded(self):
+        code, _, err = self.run_cmd("clear", "~/code/nope")
+        self.assertEqual(code, 1)
+        self.assertNotIn("relative path", err, "~ is not a relative path")
+
     def test_a_file_is_refused(self):
         code, _, err = self.run_cmd("clear", self.d_file)
         self.assertEqual(code, 1)

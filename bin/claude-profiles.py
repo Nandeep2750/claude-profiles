@@ -1407,11 +1407,17 @@ def cmd_clear(a):
 
     raw = a.path or os.getcwd()
     target = os.path.realpath(os.path.expanduser(raw))
-    if not os.path.exists(target):
-        print(f"no such path: {raw}", file=sys.stderr)
-        return 1
-    if not os.path.isdir(target):
-        print(f"not a directory: {raw}", file=sys.stderr)
+    if not os.path.exists(target) or not os.path.isdir(target):
+        why = "not a directory" if os.path.exists(target) else "no such path"
+        print(f"{why}: {raw}", file=sys.stderr)
+        # the shell expands the argument before this sees it, so showing both
+        # says whether a tilde or a completion turned it into something else
+        if os.path.abspath(os.path.expanduser(raw)) != os.path.abspath(raw):
+            print(f"  your shell passed: {os.path.expanduser(raw)}", file=sys.stderr)
+        if target != os.path.abspath(os.path.expanduser(raw)):
+            print(f"  which resolves to: {target}", file=sys.stderr)
+        if not os.path.isabs(os.path.expanduser(raw)):
+            print(f"  read as a relative path, from {os.getcwd()}", file=sys.stderr)
         return 1
 
     if a.profile:
