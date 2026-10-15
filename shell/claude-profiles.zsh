@@ -207,6 +207,7 @@ _claude_clear() {
     '(-a --all)'{-a,--all}'[select every session listed]' \
     '(-n --dry-run)'{-n,--dry-run}'[show what would go, delete nothing]' \
     '(-y --yes)'{-y,--yes}'[skip the confirmation]' \
+    '--traces[sweep files left by sessions that are already deleted]' \
     '--plain[no borders]'
 }
 compdef _claude_clear claude-clear

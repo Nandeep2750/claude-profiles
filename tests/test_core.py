@@ -1035,7 +1035,7 @@ class TestStrandedSideFiles(Fixture):
         transcript(os.path.join(self.pdir, self.sid + ".jsonl"), self.proj, ["hi"])
         _, out, _ = self.run_cmd("doctor")
         self.assertNotIn("aaa11111", out)
-        self.assertIn("sit with its transcript", out)
+        self.assertIn("nothing is left over", out)
 
     def test_memory_is_not_mistaken_for_a_session_directory(self):
         mem = os.path.join(self.pdir, "memory")
@@ -1043,7 +1043,7 @@ class TestStrandedSideFiles(Fixture):
         with open(os.path.join(mem, "MEMORY.md"), "w") as fh:
             fh.write("- [a](a.md)\n")
         _, out, _ = self.run_cmd("doctor")
-        self.assertIn("sit with its transcript", out)
+        self.assertIn("nothing is left over", out)
 
     def test_a_bak_does_not_count_as_a_live_transcript(self):
         self.side(self.sid)
@@ -1054,7 +1054,150 @@ class TestStrandedSideFiles(Fixture):
 
     def test_nothing_to_report_on_an_empty_profile(self):
         _, out, _ = self.run_cmd("doctor")
-        self.assertIn("sit with its transcript", out)
+        self.assertIn("nothing is left over", out)
+
+
+class TestSessionTraces(Fixture):
+    """Claude Code keys several profile-level folders by session id. Deleting
+    only the transcript leaves that content readable, which is the whole point
+    of deleting a session."""
+
+    def setUp(self):
+        super().setUp()
+        self.proj = os.path.join(self.home, "code", "api")
+        os.makedirs(self.proj, exist_ok=True)
+        self.enc = encode_dir(self.proj)
+        self.sid = "aaa11111-0000-0000-0000-000000000000"
+        self.other = "bbb22222-0000-0000-0000-000000000000"
+        self.wdir = os.path.join(self.ph, "work")
+        transcript(os.path.join(self.wdir, "projects", self.enc, self.sid + ".jsonl"),
+                   self.proj, ["one"])
+
+    def trace(self, top, name, body="secret source code"):
+        path = os.path.join(self.wdir, top, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        if name.endswith((".mode", ".json")):
+            with open(path, "w") as fh:
+                fh.write(body)
+        else:
+            os.makedirs(path, exist_ok=True)
+            with open(os.path.join(path, "v1"), "w") as fh:
+                fh.write(body)
+        return path
+
+    # ---- what counts as a trace -------------------------------------------
+    def test_a_directory_named_after_the_session_is_found(self):
+        hist = self.trace("file-history", self.sid)
+        self.assertIn(hist, self.core.session_traces(self.wdir, self.sid))
+
+    def test_a_file_named_after_the_session_is_found(self):
+        mode = self.trace(".caveman-sessions", self.sid + ".mode", "caveman")
+        self.assertIn(mode, self.core.session_traces(self.wdir, self.sid))
+
+    def test_the_short_prefix_jobs_uses_is_found(self):
+        job = self.trace("jobs", self.sid[:8])
+        self.assertIn(job, self.core.session_traces(self.wdir, self.sid))
+
+    def test_another_sessions_files_are_not_touched(self):
+        mine = self.trace("file-history", self.sid)
+        theirs = self.trace("file-history", self.other)
+        traces = self.core.session_traces(self.wdir, self.sid)
+        self.assertIn(mine, traces)
+        self.assertNotIn(theirs, traces)
+
+    def test_a_name_that_merely_contains_the_id_is_not_touched(self):
+        near = self.trace("file-history", self.sid + "-copy")
+        self.assertNotIn(near, self.core.session_traces(self.wdir, self.sid))
+
+    def test_the_projects_directory_is_left_to_the_session_itself(self):
+        for path in self.core.session_traces(self.wdir, self.sid):
+            self.assertNotIn(os.sep + "projects" + os.sep, path)
+
+    # ---- clearing a session takes them ------------------------------------
+    def test_clear_deletes_the_traces(self):
+        hist = self.trace("file-history", self.sid)
+        job = self.trace("jobs", self.sid[:8])
+        mode = self.trace(".caveman-sessions", self.sid + ".mode", "caveman")
+        code, out, _ = self.run_cmd("clear", self.proj, "--all", "--yes", "--plain")
+        self.assertEqual(code, 0)
+        for path in (hist, job, mode):
+            self.assertFalse(os.path.exists(path), path)
+
+    def test_clear_names_what_each_file_held(self):
+        self.trace("file-history", self.sid)
+        _, out, _ = self.run_cmd("clear", self.proj, "--all", "--dry-run", "--plain")
+        self.assertIn("copies of the files it edited", out)
+        self.assertIn("the conversation", out)
+
+    def test_clear_leaves_another_sessions_traces_alone(self):
+        theirs = self.trace("file-history", self.other)
+        self.run_cmd("clear", self.proj, "--all", "--yes", "--plain")
+        self.assertTrue(os.path.exists(theirs))
+
+    def test_the_traces_count_towards_the_size_freed(self):
+        self.trace("file-history", self.sid, "x" * 5000)
+        _, out, _ = self.run_cmd("clear", self.proj, "--all", "--dry-run", "--plain")
+        self.assertIn("KB", out)
+
+    # ---- sweeping ones left behind earlier --------------------------------
+    def test_doctor_reports_a_trace_with_no_session(self):
+        self.trace("file-history", self.other)
+        _, out, _ = self.run_cmd("doctor")
+        self.assertIn("named after deleted sessions", out)
+
+    def test_doctor_is_quiet_when_the_session_is_still_there(self):
+        self.trace("file-history", self.sid)
+        _, out, _ = self.run_cmd("doctor")
+        self.assertIn("nothing is left over", out)
+
+    def test_traces_mode_lists_and_deletes_them(self):
+        orphan = self.trace("file-history", self.other)
+        code, out, _ = self.run_cmd("clear", "--traces", "--dry-run", "--plain")
+        self.assertEqual(code, 0)
+        self.assertIn("file-history", out)
+        self.assertTrue(os.path.exists(orphan), "dry run must not delete")
+        code, out, _ = self.run_cmd("clear", "--traces", "--yes", "--plain")
+        self.assertEqual(code, 0)
+        self.assertFalse(os.path.exists(orphan))
+
+    def test_a_session_living_in_another_profile_is_not_stranded(self):
+        # handing a session over moves the transcript but not these files
+        moved = self.trace("file-history", self.other)
+        transcript(os.path.join(self.home, ".claude", "projects", self.enc,
+                                self.other + ".jsonl"), self.proj, ["moved here"])
+        self.assertEqual(self.core.stranded_traces("work"), [],
+                         "the session still exists, in another profile")
+        self.run_cmd("clear", "--traces", "--yes", "--plain")
+        self.assertTrue(os.path.exists(moved), "a resumable session lost its history")
+
+    def test_doctor_is_quiet_about_a_session_held_in_another_profile(self):
+        self.trace("file-history", self.other)
+        transcript(os.path.join(self.home, ".claude", "projects", self.enc,
+                                self.other + ".jsonl"), self.proj, ["moved here"])
+        _, out, _ = self.run_cmd("doctor")
+        self.assertIn("nothing is left over", out)
+
+    def test_traces_mode_keeps_a_live_sessions_files(self):
+        mine = self.trace("file-history", self.sid)
+        self.run_cmd("clear", "--traces", "--yes", "--plain")
+        self.assertTrue(os.path.exists(mine), "this session still exists")
+
+    def test_traces_mode_refuses_a_path(self):
+        code, _, err = self.run_cmd("clear", self.proj, "--traces")
+        self.assertEqual(code, 2)
+        self.assertIn("takes no path", err)
+
+    def test_traces_mode_says_so_when_there_is_nothing(self):
+        code, out, _ = self.run_cmd("clear", "--traces", "--plain")
+        self.assertEqual(code, 0)
+        self.assertIn("nothing left over", out)
+
+    def test_traces_mode_can_be_limited_to_one_profile(self):
+        orphan = self.trace("file-history", self.other)
+        code, out, _ = self.run_cmd("clear", "--traces", "-p", "empty",
+                                    "--yes", "--plain")
+        self.assertEqual(code, 0)
+        self.assertTrue(os.path.exists(orphan), "a different profile was swept")
 
 
 class TestHandoff(Fixture):

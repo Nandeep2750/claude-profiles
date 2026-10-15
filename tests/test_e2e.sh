@@ -112,6 +112,12 @@ expect "refuses to guess without a tty"     'claude-clear "$HOME/work/app" --pla
 expect "deletes what was chosen"            'claude-clear "$HOME/work/app" -s eee55555 -y --plain' "freed"
 check  "  transcript is gone"               '[ ! -f "$HOME/.claude/projects/-tmp-clearme/eee55555-0000-0000-0000-000000000000.jsonl" ]'
 check  "  side files are gone"              '[ ! -d "$HOME/.claude/projects/-tmp-clearme/eee55555-0000-0000-0000-000000000000" ]'
+_run 'mkdir -p "$HOME/.claude/file-history/eee55555-0000-0000-0000-000000000000"; printf src > "$HOME/.claude/file-history/eee55555-0000-0000-0000-000000000000/v1"' >/dev/null
+expect "finds files left by a deleted session" 'claude-clear --traces -n --plain' "file-history"
+check  "  dry run kept them"                   '[ -d "$HOME/.claude/file-history/eee55555-0000-0000-0000-000000000000" ]'
+expect "sweeps them with --yes"                'claude-clear --traces -y --plain' "freed"
+check  "  they are gone"                       '[ ! -d "$HOME/.claude/file-history/eee55555-0000-0000-0000-000000000000" ]'
+expect "--traces takes no path"                'claude-clear "$HOME" --traces 2>&1' "takes no path"
 
 echo "-- sessions --"
 expect "lists them"                       'claude-sessions -a -d /tmp/proj'                 "SESSION ID"

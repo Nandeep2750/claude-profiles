@@ -356,6 +356,7 @@ this cannot be undone. type y to delete:
 | `-a`, `--all` | select every session listed |
 | `-n`, `--dry-run` | show what would go, delete nothing |
 | `-y`, `--yes` | skip the confirmation |
+| `--traces` | instead, sweep files left by sessions that are already deleted |
 | `--plain` | no borders |
 
 ### What it looks at, and what it deletes
@@ -364,17 +365,67 @@ Sessions are matched on the working directory **recorded inside** each
 transcript, not on the folder name, so a session handed between profiles is
 still found. Symlinks are resolved, so `/tmp` and `/private/tmp` match.
 
-Deleting a session removes everything that belongs to it:
+Deleting a session removes everything that belongs to it. The conversation is
+only part of that: Claude Code keys several folders beside `projects/` by
+session id, and some of them hold real content.
 
-| Removed | Kept |
+| Removed | What it held |
 |---|---|
-| `<session-id>.jsonl`, the conversation | `memory/` - shared by every session in the project |
-| `<session-id>.jsonl.bak`, left by a handoff | sessions for other directories |
-| `<session-id>/`, its tool results and subagent logs | sessions in subdirectories, unless you pass `-r` |
+| `projects/<dir>/<session-id>.jsonl` | the conversation |
+| `projects/<dir>/<session-id>.jsonl.bak` | a copy left by an earlier handoff |
+| `projects/<dir>/<session-id>/` | its tool results and subagent transcripts |
+| `file-history/<session-id>/` | **copies of every file that session edited**, version by version |
+| `jobs/<short-id>/` | a background job's state and timeline |
+| `session-env/<session-id>/` | its environment |
+| `tasks/<session-id>/` | its task state |
+| anything else named `<session-id>` or `<session-id>.*` | plugin notes and the like |
 
-Memory is deliberately left behind. It belongs to the project rather than to
-one conversation, so clearing a session must not take it. Delete the `memory/`
-folder yourself if you want that gone too.
+Only exact names count. A folder that merely contains the id, and another
+session's files, are never touched.
+
+| Kept | Why |
+|---|---|
+| `memory/` | shared by every session in the project, not owned by one conversation |
+| sessions for other directories | out of scope |
+| sessions in subdirectories | unless you pass `-r` |
+
+`file-history/` is the one that matters most. It holds readable copies of your
+source files as that session changed them, so deleting the transcript alone
+leaves the content behind. Delete the `memory/` folder yourself if you want
+that gone too.
+
+!!! warning "Deleting is not erasing"
+    These files are unlinked, not overwritten, so the blocks survive until the
+    disk reuses them. Your backups keep their own copies regardless. If a
+    session saw a password or a token, rotate it - do not rely on deleting the
+    file.
+
+### Sweeping up after older versions
+
+Before 2.3.0, `claude-clear` removed the transcript and its side files but not
+the folders beside `projects/`. `claude-prune` never removed them either.
+`claude-doctor` reports whatever is left, and one command clears it:
+
+```sh
+claude-clear --traces -n     # list what is left over, delete nothing
+claude-clear --traces        # list, then ask before deleting
+claude-clear --traces -p work
+```
+
+It only ever removes files named after a session that no longer exists in that
+profile, so nothing a live session needs can be caught by it.
+
+```
+119 file(s) named after sessions that no longer exist, 7.2MB
+
+╭─────────┬───────────────┬───────┬─────────┬───────────────────────────────╮
+│ PROFILE │ WHERE         │ FILES │    SIZE │ WHAT IT HELD                  │
+├─────────┼───────────────┼───────┼─────────┼───────────────────────────────┤
+│ default │ file-history  │     4 │   2.1MB │ copies of the files it edited │
+│ default │ jobs          │     2 │   2.3KB │ a background job's state      │
+│ work    │ session-env   │    29 │      0B │ its environment               │
+╰─────────┴───────────────┴───────┴─────────┴───────────────────────────────╯
+```
 
 ### Without a prompt
 
@@ -397,6 +448,7 @@ claude-clear ~/projects/<project-name> --all -n         # just show the plan
 | Only one account's copies | `claude-clear ~/projects/<project-name> -p work` |
 | Drop one session by its id prefix | `claude-clear ~/projects/<project-name> -s a3f81c2e -y` |
 | Wipe the project, no prompt | `claude-clear ~/projects/<project-name> --all -y` |
+| Clean up after older versions | `claude-clear --traces -n` |
 | Easier to read in a narrow window | add `--plain` |
 
 Flags combine, so `-r -p work -n` previews everything `work` recorded in that

@@ -26,7 +26,7 @@ import time
 import urllib.error
 import urllib.request
 
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -943,6 +943,62 @@ def stranded_side_dirs(pname):
     return out
 
 
+FULL_ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+
+def live_session_ids(pname):
+    """Every session this profile can still resume."""
+    return {os.path.basename(f)[:-6] for f in transcripts(pname)}
+
+
+def all_session_ids():
+    """Every session any profile can still resume."""
+    out = set()
+    for name in profile_names():
+        out |= live_session_ids(name)
+    return out
+
+
+def stranded_traces(pname, live=None):
+    """Profile-level files named after a session that no longer exists anywhere.
+
+    Left behind by anything that deleted a transcript without sweeping the
+    directories beside projects/ - including claude-clear before 2.3.0, and
+    claude-prune, which only ever removed the transcript.
+
+    Liveness is judged across every profile, not just this one. Handing a
+    session over moves its transcript but not these files, so a session living
+    in another profile would otherwise look deleted and its file history would
+    be swept while it is still resumable.
+    """
+    pdir = profile_dir(pname)
+    if live is None:
+        live = all_session_ids()
+    shorts = {s[:8] for s in live}
+    out = []
+    try:
+        tops = sorted(os.listdir(pdir))
+    except OSError:
+        return out
+    for top in tops:
+        if top == "projects":
+            continue
+        tdir = os.path.join(pdir, top)
+        if not os.path.isdir(tdir):
+            continue
+        try:
+            names = sorted(os.listdir(tdir))
+        except OSError:
+            continue
+        for name in names:
+            stem = name.split(".", 1)[0]
+            gone = ((FULL_ID.match(stem) and stem not in live)
+                    or (SHORT_ID.match(stem) and stem not in shorts))
+            if gone:
+                out.append((os.path.join(tdir, name), stem, top))
+    return out
+
+
 def retire_side(src, enc, sid, clean, source_name, C):
     """Drop the source side files after a move, or say why they stayed."""
     src_dir = os.path.join(src, "projects", enc, sid)
@@ -1340,6 +1396,69 @@ def is_under(child, parent):
     return False
 
 
+SHORT_ID = re.compile(r"^[0-9a-f]{8}$")
+
+
+def session_traces(pdir, sid):
+    """Anything elsewhere in the profile that is named after one session.
+
+    Claude Code and its plugins key several profile-level directories by
+    session id - file-history/<id>/ holds copies of the files that session
+    edited, jobs/<short>/ holds a background job's state and timeline,
+    session-env/<id>/, tasks/<id>/ and a plugin's <id>.mode all follow the
+    same shape. Deleting only the transcript leaves that content readable.
+
+    Only exact names count: <id>, <id>.<ext>, or the 8-character prefix that
+    jobs/ uses. A name that merely contains the id is left alone.
+    """
+    short = sid[:8]
+    found = []
+    try:
+        tops = sorted(os.listdir(pdir))
+    except OSError:
+        return found
+    for top in tops:
+        if top == "projects":
+            continue                       # the session itself lives there
+        tdir = os.path.join(pdir, top)
+        if not os.path.isdir(tdir):
+            continue
+        try:
+            names = sorted(os.listdir(tdir))
+        except OSError:
+            continue
+        for name in names:
+            stem = name.split(".", 1)[0]
+            if name == sid or stem == sid or (stem == short and SHORT_ID.match(stem)):
+                found.append(os.path.join(tdir, name))
+    return found
+
+
+PART_LABELS = {
+    "file-history":   "copies of the files it edited",
+    "jobs":           "a background job's state",
+    "session-env":    "its environment",
+    "tasks":          "its task state",
+    "shell-snapshots": "its shell snapshot",
+    "plans":          "its saved plan",
+    "image-cache":    "images it was shown",
+    ".caveman-sessions": "a plugin's note about it",
+}
+
+
+def describe_part(part, pdir):
+    """A short label for one of a session's files, for the delete list."""
+    rel = os.path.relpath(part, pdir)
+    top = rel.split(os.sep)[0]
+    if top != "projects":
+        return PART_LABELS.get(top, f"its {top} entry")
+    if part.endswith(".jsonl"):
+        return "the conversation"
+    if part.endswith(".jsonl.bak"):
+        return "a handoff's copy"
+    return "tool results and subagent logs"
+
+
 def session_parts(f):
     """Everything on disk that belongs to one session.
 
@@ -1400,10 +1519,79 @@ def delete_parts(parts):
     return None
 
 
+def clear_traces(a, C, D):
+    """Delete profile-level files named after sessions that are already gone."""
+    want = [a.profile] if a.profile else profile_names()
+    live = all_session_ids()
+    rows = []
+    for prof in want:
+        for path, sid, top in stranded_traces(prof, live):
+            size = dir_size(path) if os.path.isdir(path) else os.path.getsize(path)
+            rows.append((prof, sid, top, path, size))
+    if not rows:
+        print("nothing left over from a deleted session"
+              f" (profiles: {', '.join(want)})")
+        return 0
+
+    freed = sum(r[4] for r in rows)
+    print(f"{len(rows)} file(s) named after sessions that no longer exist,"
+          f" {human(freed)}")
+    by_profile = {}
+    for prof, sid, top, _, size in rows:
+        by_profile.setdefault((prof, top), []).append((sid, size))
+    headers = ["PROFILE", "WHERE", "FILES", "SIZE", "WHAT IT HELD"]
+    table = []
+    for (prof, top), items in sorted(by_profile.items()):
+        table.append([prof, top, str(len(items)),
+                      human(sum(i[1] for i in items)),
+                      PART_LABELS.get(top, "named after a session")])
+    print(render_table(headers, table, ["l", "l", "r", "r", "l"],
+                       plain=a.plain, dim=D))
+
+    if a.dry_run:
+        print(C("\ndry run - nothing deleted", "yl"))
+        return 0
+    if not a.yes:
+        print(C("\nthis cannot be undone.", "yl"), end=" ")
+        try:
+            if input("type y to delete: ").strip().lower() not in ("y", "yes"):
+                print("nothing deleted")
+                return 0
+        except (EOFError, KeyboardInterrupt):
+            print("\nnothing deleted")
+            return 0
+
+    gone = 0
+    for _, _, _, path, _ in rows:
+        err = delete_parts([path])
+        if err:
+            print(f"could not delete {path}: {err}", file=sys.stderr)
+        else:
+            gone += 1
+    print(C(f"deleted {gone} file(s), freed {human(freed)}", "gr"))
+    return 0 if gone == len(rows) else 1
+
+
 def cmd_clear(a):
     """List one directory's sessions across every profile and delete the chosen ones."""
     C = color()
     D = lambda t: C(t, "dim")          # noqa: E731
+
+    if a.traces:
+        if a.path:
+            print("--traces sweeps whole profiles - it takes no path",
+                  file=sys.stderr)
+            return 2
+        if a.profile:
+            try:
+                check_name(a.profile)
+            except BadProfileName as e:
+                print(str(e), file=sys.stderr)
+                return 1
+            if a.profile not in profile_names():
+                print(f"no such profile: {a.profile}", file=sys.stderr)
+                return 1
+        return clear_traces(a, C, D)
 
     raw = a.path or os.getcwd()
     target = os.path.realpath(os.path.expanduser(raw))
@@ -1450,8 +1638,9 @@ def cmd_clear(a):
                 where = os.path.relpath(here, target)
             else:
                 continue
-            parts = session_parts(f)
-            found.append((info[3], prof, os.path.basename(f)[:-6], info[2],
+            sid = os.path.basename(f)[:-6]
+            parts = session_parts(f) + session_traces(profile_dir(prof), sid)
+            found.append((info[3], prof, sid, info[2],
                           info[4], where, parts, parts_size(parts)))
     found.sort(reverse=True)
 
@@ -1525,10 +1714,10 @@ def cmd_clear(a):
     print(f"\nabout to delete {C(str(len(chosen)), 'rd')} session(s), {human(freed)}:")
     for _, prof, sid, turns, _, _, parts, size in chosen:
         print(f"  {C(sid, 'cy')}  {D(f'{prof}, {turns} turns, {human(size)}')}")
+        pdir = profile_dir(prof)
         for part in parts:
-            tag = "side files" if os.path.isdir(part) else os.path.basename(part)[-4:]
             print(D(f"      {part.replace(HOME, '~')}")
-                  + (D(f"  ({tag})") if os.path.isdir(part) else ""))
+                  + D(f"  ({describe_part(part, pdir)})"))
 
     if a.dry_run:
         print(C("\ndry run - nothing deleted", "yl"))
@@ -1991,13 +2180,23 @@ def cmd_doctor(a):
 
     print(C("\nstranded session files", "b"))
     found = False
+    live_everywhere = all_session_ids()
     for n in names:
         for _, sid, size in stranded_side_dirs(n):
             found = True
             warn(f"{n}: {sid[:8]} has side files but no transcript ({human(size)}) - "
                  "the session was handed off before 2.1.0, which left them behind")
+        traces = stranded_traces(n, live_everywhere)
+        if traces:
+            found = True
+            bulk = sum(dir_size(p) if os.path.isdir(p) else os.path.getsize(p)
+                       for p, _, _ in traces)
+            wheres = sorted({top for _, _, top in traces})
+            warn(f"{n}: {len(traces)} file(s) named after deleted sessions"
+                 f" in {', '.join(wheres)} ({human(bulk)}) - "
+                 "delete them with 'claude-profiles clear --traces'")
     if not found:
-        ok("every session's side files sit with its transcript")
+        ok("nothing is left over from a deleted session")
 
     print(C("\nproject markers", "b"))
     markers = find_markers()
@@ -2095,6 +2294,9 @@ def main():
                    help="show what would go, delete nothing")
     p.add_argument("-y", "--yes", action="store_true",
                    help="skip the confirmation")
+    p.add_argument("--traces", action="store_true",
+                   help="instead, sweep files left behind by sessions that are"
+                        " already deleted (takes no path)")
     p.add_argument("--plain", action="store_true")
     p.set_defaults(fn=cmd_clear)
 
