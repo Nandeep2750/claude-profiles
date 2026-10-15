@@ -397,6 +397,247 @@ class TestSearch(Fixture):
         self.assertNotIn("what about storage", out)
 
 
+class TestPickParsing(Fixture):
+    """The number picker. Anything it misreads deletes the wrong session."""
+
+    def picks(self, text, n=5):
+        return self.core.parse_picks(text, n)
+
+    def test_single_number(self):
+        self.assertEqual(self.picks("3"), [3])
+
+    def test_a_list(self):
+        self.assertEqual(self.picks("1,3,5"), [1, 3, 5])
+
+    def test_a_range(self):
+        self.assertEqual(self.picks("2-4"), [2, 3, 4])
+
+    def test_mixed_and_deduplicated(self):
+        self.assertEqual(self.picks("1, 2-4 3"), [1, 2, 3, 4])
+
+    def test_spaces_instead_of_commas(self):
+        self.assertEqual(self.picks("1 5"), [1, 5])
+
+    def test_all(self):
+        self.assertEqual(self.picks("all", 3), [1, 2, 3])
+        self.assertEqual(self.picks("ALL", 3), [1, 2, 3])
+
+    def test_empty_cancels(self):
+        for text in ("", "  ", "q", "no", "none"):
+            self.assertEqual(self.picks(text), [], text)
+
+    def test_out_of_range_is_rejected(self):
+        for text in ("0", "6", "1-6", "-1"):
+            self.assertIsNone(self.picks(text), text)
+
+    def test_a_backwards_range_is_rejected(self):
+        self.assertIsNone(self.picks("4-2"))
+
+    def test_junk_is_rejected(self):
+        for text in ("x", "1;rm", "1.5", "2/3", "all the things"):
+            self.assertIsNone(self.picks(text), text)
+
+
+class TestTranscriptListing(Fixture):
+    """transcripts() must yield sessions only. A subagent log inside
+    <session-id>/ is part of a session, and prune once offered to delete it."""
+
+    def setUp(self):
+        super().setUp()
+        self.proj = os.path.join(self.home, "code", "api")
+        os.makedirs(self.proj, exist_ok=True)
+        self.enc = encode_dir(self.proj)
+        self.pdir = os.path.join(self.home, ".claude", "projects", self.enc)
+        self.sid = "aaa11111-0000-0000-0000-000000000000"
+        transcript(os.path.join(self.pdir, self.sid + ".jsonl"), self.proj, ["hi"])
+
+    def nested(self, *parts):
+        path = os.path.join(self.pdir, self.sid, *parts)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            fh.write("{}\n")
+        return path
+
+    def test_a_subagent_log_is_not_a_session(self):
+        self.nested("subagents", "agent-abc123.jsonl")
+        self.assertEqual([os.path.basename(f) for f in self.core.transcripts("default")],
+                         [self.sid + ".jsonl"])
+
+    def test_a_workflow_journal_is_not_a_session(self):
+        self.nested("subagents", "workflows", "wf_1", "journal.jsonl")
+        self.assertEqual(len(list(self.core.transcripts("default"))), 1)
+
+    def test_prune_leaves_side_files_alone(self):
+        log = self.nested("subagents", "agent-abc123.jsonl")
+        long_ago = time.time() - 300 * 86400
+        os.utime(log, (long_ago, long_ago))
+        code, out, _ = self.run_cmd("prune", "-o", "90", "--yes", "--plain")
+        self.assertEqual(code, 0)
+        self.assertTrue(os.path.isfile(log), "a session's side files are not sessions")
+
+    def test_a_bak_is_not_listed_as_a_session(self):
+        with open(os.path.join(self.pdir, "bbb22222-0000-0000-0000-000000000000.jsonl.bak"),
+                  "w") as fh:
+            fh.write("{}\n")
+        self.assertEqual(len(list(self.core.transcripts("default"))), 1)
+
+    def test_a_missing_projects_directory_is_not_an_error(self):
+        self.assertEqual(list(self.core.transcripts("empty")), [])
+
+
+class TestClear(Fixture):
+    """clear takes a project path, lists that directory's sessions across every
+    profile, and deletes the chosen ones with everything that belongs to them."""
+
+    def setUp(self):
+        super().setUp()
+        self.proj = os.path.join(self.home, "code", "api")
+        self.sub = os.path.join(self.proj, "web")
+        os.makedirs(self.sub, exist_ok=True)
+        self.enc = encode_dir(self.proj)
+        self.senc = encode_dir(self.sub)
+        # one in the default profile, one in work, one in a subdirectory
+        self.d_file = os.path.join(self.home, ".claude", "projects", self.enc,
+                                   "aaa11111-0000-0000-0000-000000000000.jsonl")
+        self.w_file = os.path.join(self.ph, "work", "projects", self.enc,
+                                   "bbb22222-0000-0000-0000-000000000000.jsonl")
+        self.s_file = os.path.join(self.ph, "work", "projects", self.senc,
+                                   "ccc33333-0000-0000-0000-000000000000.jsonl")
+        transcript(self.d_file, self.proj, ["one"])
+        transcript(self.w_file, self.proj, ["two", "three"])
+        transcript(self.s_file, self.sub, ["in a subdirectory"])
+
+    def side_of(self, f):
+        d = f[:-6]
+        os.makedirs(os.path.join(d, "tool-results"), exist_ok=True)
+        with open(os.path.join(d, "tool-results", "r1.txt"), "w") as fh:
+            fh.write("payload")
+        return d
+
+    # ---- the path argument -------------------------------------------------
+    def test_a_missing_path_is_refused(self):
+        code, _, err = self.run_cmd("clear", os.path.join(self.home, "nope"))
+        self.assertEqual(code, 1)
+        self.assertIn("no such path", err)
+
+    def test_a_file_is_refused(self):
+        code, _, err = self.run_cmd("clear", self.d_file)
+        self.assertEqual(code, 1)
+        self.assertIn("not a directory", err)
+
+    def test_a_directory_with_no_sessions_says_so(self):
+        code, out, _ = self.run_cmd("clear", self.home, "--plain")
+        self.assertEqual(code, 0)
+        self.assertIn("no sessions recorded", out)
+
+    def test_an_unknown_profile_is_refused(self):
+        code, _, err = self.run_cmd("clear", self.proj, "-p", "nosuch")
+        self.assertEqual(code, 1)
+        self.assertIn("no such profile", err)
+
+    def test_a_traversal_profile_name_is_refused(self):
+        code, _, err = self.run_cmd("clear", self.proj, "-p", "../escape")
+        self.assertEqual(code, 1)
+        self.assertIn("invalid profile name", err)
+
+    # ---- listing -----------------------------------------------------------
+    def test_lists_every_profile_for_that_path(self):
+        code, out, _ = self.run_cmd("clear", self.proj, "--dry-run", "--all", "--plain")
+        self.assertEqual(code, 0)
+        self.assertIn("aaa11111", out)
+        self.assertIn("bbb22222", out)
+
+    def test_a_subdirectory_session_is_left_out_by_default(self):
+        _, out, _ = self.run_cmd("clear", self.proj, "--dry-run", "--all", "--plain")
+        self.assertNotIn("ccc33333", out)
+
+    def test_under_includes_subdirectories(self):
+        _, out, _ = self.run_cmd("clear", self.proj, "-r", "--dry-run", "--all", "--plain")
+        self.assertIn("ccc33333", out)
+
+    def test_profile_narrows_the_list(self):
+        _, out, _ = self.run_cmd("clear", self.proj, "-p", "work",
+                                 "--dry-run", "--all", "--plain")
+        self.assertIn("bbb22222", out)
+        self.assertNotIn("aaa11111", out)
+
+    # ---- choosing without a prompt -----------------------------------------
+    def test_dry_run_deletes_nothing(self):
+        code, out, _ = self.run_cmd("clear", self.proj, "--all", "--dry-run", "--plain")
+        self.assertEqual(code, 0)
+        self.assertIn("dry run", out)
+        self.assertTrue(os.path.isfile(self.d_file))
+        self.assertTrue(os.path.isfile(self.w_file))
+
+    def test_all_with_yes_deletes_both_copies(self):
+        code, out, _ = self.run_cmd("clear", self.proj, "--all", "--yes", "--plain")
+        self.assertEqual(code, 0)
+        self.assertFalse(os.path.exists(self.d_file))
+        self.assertFalse(os.path.exists(self.w_file))
+        self.assertTrue(os.path.isfile(self.s_file), "a subdirectory session is not touched")
+
+    def test_session_prefix_deletes_just_that_one(self):
+        code, _, _ = self.run_cmd("clear", self.proj, "-s", "bbb22222", "--yes", "--plain")
+        self.assertEqual(code, 0)
+        self.assertFalse(os.path.exists(self.w_file))
+        self.assertTrue(os.path.isfile(self.d_file))
+
+    def test_a_session_not_in_the_list_is_refused(self):
+        code, _, err = self.run_cmd("clear", self.proj, "-s", "zzz99999", "--yes")
+        self.assertEqual(code, 1)
+        self.assertIn("not in this list", err)
+        self.assertTrue(os.path.isfile(self.d_file))
+
+    def test_no_selection_without_a_terminal_is_refused(self):
+        code, _, err = self.run_cmd("clear", self.proj, "--plain")
+        self.assertEqual(code, 1)
+        self.assertIn("nothing selected", err)
+        self.assertTrue(os.path.isfile(self.d_file))
+
+    # ---- what gets deleted -------------------------------------------------
+    def test_the_side_files_go_with_the_session(self):
+        side = self.side_of(self.w_file)
+        code, _, _ = self.run_cmd("clear", self.proj, "-s", "bbb22222", "--yes", "--plain")
+        self.assertEqual(code, 0)
+        self.assertFalse(os.path.exists(side))
+
+    def test_a_bak_goes_with_the_session(self):
+        bak = self.w_file + ".bak"
+        with open(bak, "w") as fh:
+            fh.write("{}\n")
+        self.run_cmd("clear", self.proj, "-s", "bbb22222", "--yes", "--plain")
+        self.assertFalse(os.path.exists(bak))
+
+    def test_the_projects_memory_is_left_alone(self):
+        mem = os.path.join(self.ph, "work", "projects", self.enc, "memory")
+        os.makedirs(mem, exist_ok=True)
+        with open(os.path.join(mem, "MEMORY.md"), "w") as fh:
+            fh.write("- [a](a.md)\n")
+        self.run_cmd("clear", self.proj, "--all", "--yes", "--plain")
+        self.assertTrue(os.path.isfile(os.path.join(mem, "MEMORY.md")),
+                        "memory is shared by the project, not owned by one session")
+
+    def test_another_projects_sessions_are_left_alone(self):
+        other = os.path.join(self.home, "code", "other")
+        os.makedirs(other, exist_ok=True)
+        keep = os.path.join(self.ph, "work", "projects", encode_dir(other),
+                            "ddd44444-0000-0000-0000-000000000000.jsonl")
+        transcript(keep, other, ["different project"])
+        self.run_cmd("clear", self.proj, "--all", "--yes", "--plain")
+        self.assertTrue(os.path.isfile(keep))
+
+    def test_the_freed_size_is_reported(self):
+        _, out, _ = self.run_cmd("clear", self.proj, "--all", "--yes", "--plain")
+        self.assertIn("freed", out)
+
+    def test_session_parts_finds_all_three(self):
+        side = self.side_of(self.w_file)
+        with open(self.w_file + ".bak", "w") as fh:
+            fh.write("{}\n")
+        parts = self.core.session_parts(self.w_file)
+        self.assertEqual(sorted(parts), sorted([self.w_file, self.w_file + ".bak", side]))
+
+
 class TestPrune(Fixture):
     def setUp(self):
         super().setUp()

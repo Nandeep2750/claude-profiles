@@ -45,13 +45,14 @@ claude-profile() {
 # through. Keep this list in step with the core - tests/test_shell.sh checks it.
 claude-profiles() {
   case "${1:-}" in
-    clone|best|doctor|handoff|path|prune|remove|sessions|status|statusline|update) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
+    clear|clone|best|doctor|handoff|path|prune|remove|sessions|status|statusline|update) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
     *)                                          "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@" ;;
   esac
 }
 claude-doctor()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" doctor "$@" }
 claude-profile-clone() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clone "$@" }
 claude-prune()    { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" prune "$@" }
+claude-clear()    { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clear "$@" }
 claude-best()     { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" best  "$@" }
 claude-update()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" update "$@" }
 claude-version()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" --version }
@@ -195,13 +196,27 @@ _claude_doctor() { _arguments '(-u --check-upstream)'{-u,--check-upstream}'[also
 compdef _claude_doctor claude-doctor
 compdef _claude_sessions claude-sessions
 
+_claude_clear() {
+  _arguments \
+    '1:project directory:_files -/' \
+    '(-p --profile)'{-p,--profile}'[just this profile]:profile:_claude_profile_names' \
+    '(-r --under)'{-r,--under}'[also sessions started in subdirectories]' \
+    '(-s --session)'{-s,--session}'[session id or prefix]:session:' \
+    '(-a --all)'{-a,--all}'[select every session listed]' \
+    '(-n --dry-run)'{-n,--dry-run}'[show what would go, delete nothing]' \
+    '(-y --yes)'{-y,--yes}'[skip the confirmation]' \
+    '--plain[no borders]'
+}
+compdef _claude_clear claude-clear
+
 _claude_profiles() {
   if (( CURRENT == 2 )) && [[ "$words[2]" != -* ]]; then
     local -a subs
     subs=(status:'profiles, accounts and usage' doctor:'check the install for problems'
           sessions:'list conversations' handoff:'copy a session to another profile'
           remove:'delete a profile' clone:'copy settings between profiles'
-          prune:'delete old transcripts' best:'which account has the most headroom'
+          prune:'delete old transcripts' clear:'delete one directory\'s sessions'
+          best:'which account has the most headroom'
           update:'check for and pull a newer version'
           path:'print a profile config dir')
     _describe -t commands 'subcommand' subs && return

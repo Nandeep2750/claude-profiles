@@ -50,13 +50,14 @@ claude-profile() {
 # through. Keep this list in step with the core - tests/test_shell.sh checks it.
 claude-profiles() {
   case "${1:-}" in
-    clone|best|doctor|handoff|path|prune|remove|sessions|status|statusline|update) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
+    clear|clone|best|doctor|handoff|path|prune|remove|sessions|status|statusline|update) "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" "$@" ;;
     *)                                          "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" status "$@" ;;
   esac
 }
 claude-doctor()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" doctor "$@"; }
 claude-profile-clone() { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clone "$@"; }
 claude-prune()    { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" prune "$@"; }
+claude-clear()    { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" clear "$@"; }
 claude-best()     { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" best  "$@"; }
 claude-update()   { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" update "$@"; }
 claude-version()  { "$CLAUDE_PY" "$CLAUDE_PROFILE_PY" --version; }
@@ -158,6 +159,7 @@ complete -F _claude_profile_complete claude-profile-clone
 complete -W "-m --with-memory --force-memory -n --dry-run -f --force --move --copy -s --source -d --dir" claude-handoff
 complete -W "-a --all -A --all-profiles -p --profile -n --limit -f --full -d --dir --plain -g --grep" claude-sessions
 complete -W "-o --older-than -p --profile -n --limit -y --yes --plain" claude-prune
+complete -o dirnames -W "-p --profile -r --under -s --session -a --all -n --dry-run -y --yes --plain" claude-clear
 complete -W "-c --check" claude-update
 complete -W "-u --check-upstream" claude-doctor
-complete -W "status doctor sessions handoff remove clone prune best update path --live --dirs --no-usage --plain" claude-profiles
+complete -W "status doctor sessions handoff remove clone prune clear best update path --live --dirs --no-usage --plain" claude-profiles

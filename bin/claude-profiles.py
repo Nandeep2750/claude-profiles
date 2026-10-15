@@ -26,7 +26,7 @@ import time
 import urllib.error
 import urllib.request
 
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 
 HOME = os.path.expanduser("~")
 PROF_HOME = os.environ.get("CLAUDE_PROFILE_HOME", os.path.join(HOME, ".claude-profiles"))
@@ -409,11 +409,28 @@ def scan(path, pattern=None):
 
 
 def transcripts(pname):
+    """Session transcripts in a profile.
+
+    Only the files sitting directly in projects/<encoded-dir>/. Claude Code
+    writes more .jsonl files deeper down - subagent transcripts and workflow
+    journals inside <session-id>/ - and those are parts of a session, not
+    sessions. Walking the whole tree made prune offer to delete them.
+    """
     root = os.path.join(profile_dir(pname), "projects")
-    for dirpath, _, files in os.walk(root):
-        for fn in files:
-            if fn.endswith(".jsonl"):
-                yield os.path.join(dirpath, fn)
+    try:
+        projects = sorted(os.listdir(root))
+    except OSError:
+        return
+    for proj in projects:
+        pdir = os.path.join(root, proj)
+        try:
+            names = sorted(os.listdir(pdir))
+        except OSError:
+            continue
+        for fn in names:
+            full = os.path.join(pdir, fn)
+            if fn.endswith(".jsonl") and os.path.isfile(full):
+                yield full
 
 
 def age(ts):
@@ -1291,6 +1308,215 @@ def cmd_prune(a):
     return 0
 
 
+def session_parts(f):
+    """Everything on disk that belongs to one session.
+
+    The transcript, a .bak left by an earlier handoff, and the <session-id>
+    directory of tool results and subagent logs beside it. The project's
+    memory/ is not here on purpose - it is shared by every session in the
+    project, so deleting one session must not touch it.
+    """
+    sid = os.path.basename(f)[:-6]
+    parts = [f]
+    for extra in (f + ".bak", os.path.join(os.path.dirname(f), sid)):
+        if os.path.exists(extra):
+            parts.append(extra)
+    return parts
+
+
+def parts_size(parts):
+    total = 0
+    for p in parts:
+        try:
+            total += dir_size(p) if os.path.isdir(p) else os.path.getsize(p)
+        except OSError:
+            pass
+    return total
+
+
+def parse_picks(text, n):
+    """'1,3,5-7' or 'all' -> [1,3,5,6,7]. [] to cancel, None if unparsable."""
+    text = (text or "").strip().lower()
+    if text in ("a", "all", "*"):
+        return list(range(1, n + 1))
+    if text in ("", "q", "quit", "n", "no", "none"):
+        return []
+    picked = set()
+    for chunk in re.split(r"[\s,]+", text):
+        if not chunk:
+            continue
+        m = re.fullmatch(r"(\d+)(?:\s*-\s*(\d+))?", chunk)
+        if not m:
+            return None
+        lo, hi = int(m.group(1)), int(m.group(2) or m.group(1))
+        if lo < 1 or hi > n or lo > hi:
+            return None
+        picked.update(range(lo, hi + 1))
+    return sorted(picked)
+
+
+def delete_parts(parts):
+    """Remove one session's files. Returns an error string, or None."""
+    for p in parts:
+        try:
+            if os.path.isdir(p) and not os.path.islink(p):
+                shutil.rmtree(p)
+            else:
+                os.remove(p)
+        except OSError as e:
+            return str(e)
+    return None
+
+
+def cmd_clear(a):
+    """List one directory's sessions across every profile and delete the chosen ones."""
+    C = color()
+    D = lambda t: C(t, "dim")          # noqa: E731
+
+    raw = a.path or os.getcwd()
+    target = os.path.realpath(os.path.expanduser(raw))
+    if not os.path.exists(target):
+        print(f"no such path: {raw}", file=sys.stderr)
+        return 1
+    if not os.path.isdir(target):
+        print(f"not a directory: {raw}", file=sys.stderr)
+        return 1
+
+    if a.profile:
+        try:
+            check_name(a.profile)
+        except BadProfileName as e:
+            print(str(e), file=sys.stderr)
+            return 1
+        if a.profile not in profile_names():
+            print(f"no such profile: {a.profile}", file=sys.stderr)
+            print("available: " + ", ".join(profile_names()), file=sys.stderr)
+            return 1
+        want = [a.profile]
+    else:
+        want = profile_names()
+
+    found = []
+    for prof in want:
+        for f in transcripts(prof):
+            info = scan(f)
+            if not info:
+                continue
+            cwd = info[0]
+            if not cwd:
+                continue
+            here = os.path.realpath(cwd)
+            if here == target:
+                where = ""
+            elif a.under and here.startswith(target + os.sep):
+                where = here[len(target) + 1:]
+            else:
+                continue
+            parts = session_parts(f)
+            found.append((info[3], prof, os.path.basename(f)[:-6], info[2],
+                          info[4], where, parts, parts_size(parts)))
+    found.sort(reverse=True)
+
+    shown = target.replace(HOME, "~")
+    if not found:
+        scope = "or below " if a.under else ""
+        print(f"no sessions recorded in {scope}{shown}"
+              f" (profiles: {', '.join(want)})")
+        if not a.under:
+            print(D("  -r also looks at sessions started in subdirectories"))
+        return 0
+
+    total = sum(r[7] for r in found)
+    nprof = len({r[1] for r in found})
+    print(f"{len(found)} session(s) for {C(shown, 'cy')}"
+          f"  {D(f'{human(total)} across {nprof} profile(s)')}")
+    print()
+
+    headers = ["#", "PROFILE", "WHEN", "TURNS", "SIZE", "SESSION ID", "SUMMARY"]
+    aligns  = ["r", "l", "l", "r", "r", "l", "l"]
+    if a.under:
+        headers.insert(5, "SUBDIR"); aligns.insert(5, "l")
+    rows = []
+    for i, (mtime, prof, sid, turns, summary, where, _, size) in enumerate(found, 1):
+        row = [str(i), prof, age(mtime), str(turns), human(size), C(sid, "cy")]
+        if a.under:
+            row.insert(5, where or ".")
+        rows.append(row + [summary[:60] + "…" if len(summary) > 61 else summary])
+    print(render_table(headers, rows, aligns, plain=a.plain, dim=D))
+
+    if a.all:
+        picks = list(range(1, len(found) + 1))
+    elif a.session:
+        picks = [i for i, r in enumerate(found, 1)
+                 if any(r[2].startswith(s) for s in a.session)]
+        missing = [s for s in a.session
+                   if not any(r[2].startswith(s) for r in found)]
+        if missing:
+            print(f"\nnot in this list: {', '.join(missing)}", file=sys.stderr)
+            return 1
+    elif not sys.stdin.isatty():
+        print("\nnothing selected - pass --session ID, or --all, to choose"
+              " without a prompt", file=sys.stderr)
+        return 1
+    else:
+        print(D("\nwhich to delete?"))
+        print(D("  2        one"))
+        print(D("  1,3,5-7  several"))
+        print(D("  all      every session listed"))
+        print(D("  enter    cancel"))
+        try:
+            answer = input("> ")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            answer = ""
+        picks = parse_picks(answer, len(found))
+        while picks is None:
+            print(C(f"not a selection - use numbers 1-{len(found)}, or 'all'", "yl"))
+            try:
+                picks = parse_picks(input("> "), len(found))
+            except (EOFError, KeyboardInterrupt):
+                print()
+                picks = []
+
+    if not picks:
+        print("nothing deleted")
+        return 0
+
+    chosen = [found[i - 1] for i in picks]
+    freed = sum(r[7] for r in chosen)
+    print(f"\nabout to delete {C(str(len(chosen)), 'rd')} session(s), {human(freed)}:")
+    for _, prof, sid, turns, _, _, parts, size in chosen:
+        print(f"  {C(sid, 'cy')}  {D(f'{prof}, {turns} turns, {human(size)}')}")
+        for part in parts:
+            tag = "side files" if os.path.isdir(part) else os.path.basename(part)[-4:]
+            print(D(f"      {part.replace(HOME, '~')}")
+                  + (D(f"  ({tag})") if os.path.isdir(part) else ""))
+
+    if a.dry_run:
+        print(C("\ndry run - nothing deleted", "yl"))
+        return 0
+
+    if not a.yes:
+        print(C("\nthis cannot be undone.", "yl"), end=" ")
+        try:
+            if input("type y to delete: ").strip().lower() not in ("y", "yes"):
+                print("nothing deleted")
+                return 0
+        except (EOFError, KeyboardInterrupt):
+            print("\nnothing deleted")
+            return 0
+
+    gone = 0
+    for _, _, sid, _, _, _, parts, _ in chosen:
+        err = delete_parts(parts)
+        if err:
+            print(f"could not delete {sid}: {err}", file=sys.stderr)
+        else:
+            gone += 1
+    print(C(f"deleted {gone} session(s), freed {human(freed)}", "gr"))
+    return 0 if gone == len(chosen) else 1
+
+
 def cmd_best(a):
     """Name the signed-in profile with the most headroom."""
     C = color()
@@ -1815,6 +2041,24 @@ def main():
     p.add_argument("-y", "--yes", action="store_true", help="actually delete")
     p.add_argument("--plain", action="store_true")
     p.set_defaults(fn=cmd_prune)
+
+    p = sub.add_parser("clear", help="delete a directory's sessions, with a prompt")
+    p.add_argument("path", nargs="?",
+                   help="project directory (default: current)")
+    p.add_argument("-p", "--profile", help="just this profile (default: all)")
+    p.add_argument("-r", "--under", action="store_true",
+                   help="also sessions started in subdirectories of PATH")
+    p.add_argument("-s", "--session", action="append", metavar="ID",
+                   help="delete this session id or prefix instead of prompting"
+                        " (repeatable)")
+    p.add_argument("-a", "--all", action="store_true",
+                   help="select every session listed")
+    p.add_argument("-n", "--dry-run", action="store_true",
+                   help="show what would go, delete nothing")
+    p.add_argument("-y", "--yes", action="store_true",
+                   help="skip the confirmation")
+    p.add_argument("--plain", action="store_true")
+    p.set_defaults(fn=cmd_clear)
 
     p = sub.add_parser("best", help="which account has the most headroom")
     p.add_argument("-q", "--quiet", action="store_true", help="print just the name")

@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-10-15
+
+### Added
+
+- **`claude-clear [PATH]`** - delete the conversations recorded for one project
+  directory, across every profile. It checks the path exists, lists what it
+  found with a number per row, and asks which to delete (`2`, `1,3,5-7` or
+  `all`), then shows the exact files and asks once more. `-s ID` / `--all` with
+  `-y` choose without a prompt, `-n` shows the plan, `-r` includes sessions
+  started in subdirectories.
+  - Deleting a session removes its transcript, any `.jsonl.bak` beside it and
+    its `<session-id>/` side files. The project's `memory/` is deliberately
+    kept: it belongs to the project, not to one conversation.
+  - Sessions are matched on the working directory recorded inside each
+    transcript, with symlinks resolved, so a handed-off session is still found.
+  - Refuses to act without a selection when there is no terminal, rather than
+    guessing.
+
+### Fixed
+
+- **`claude-prune` could delete a live session's side files.** It listed every
+  `.jsonl` under `projects/`, which includes the subagent transcripts and
+  workflow journals Claude Code writes inside `<session-id>/`. On real data that
+  made it offer 504 "sessions" where only 106 existed, and `--yes` would have
+  deleted the side files of sessions that were nowhere near the age cutoff.
+  Session listing is now limited to the transcripts themselves, which fixes
+  `prune`, `sessions` and `handoff` alike.
+
 ## [2.1.0] - 2026-10-13
 
 ### Added
@@ -396,6 +424,7 @@ First tagged release.
 - 48 core tests and 33 shell tests, run on Ubuntu and macOS across Python 3.9
   and 3.13, in both bash and zsh, plus a PowerShell check on Windows.
 
+[2.2.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v2.2.0
 [2.1.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v2.1.0
 [2.0.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v2.0.0
 [1.10.0]: https://github.com/Nandeep2750/claude-profiles/releases/tag/v1.10.0

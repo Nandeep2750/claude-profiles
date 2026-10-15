@@ -27,7 +27,7 @@ same way on macOS, Linux, WSL and Windows.
 
     Find past conversations, move one to another account, clear out old ones.
 
-    `claude-sessions` · `claude-handoff` · `claude-prune`
+    `claude-sessions` · `claude-handoff` · `claude-clear` · `claude-prune`
 
 -   :material-folder-cog: **[Managing profiles](manage.md)**
 
@@ -70,6 +70,7 @@ same way on macOS, Linux, WSL and Windows.
 | [`claude-profile-exec`](manage.md#claude-profile-exec-profile-command-args) | Run one command under a profile without switching |
 | [`claude-profile-clone`](manage.md#claude-profile-clone-source-target) | Seed a new profile's settings from an existing one |
 | [`claude-profile-remove`](manage.md#claude-profile-remove-name) | Delete a profile, its history and its credentials |
+| [`claude-clear`](sessions.md#claude-clear-path) | Delete one project's sessions, with a prompt |
 | [`claude-prune`](sessions.md#claude-prune) | Delete old transcripts (dry run by default) |
 | [`claude-doctor`](maintenance.md#claude-profiles-doctor) | Check the installation for problems |
 | [`claude-update`](maintenance.md#claude-update) | Check for and pull a newer version |
@@ -97,6 +98,7 @@ scripts, or on a shell with no wrapper installed.
 | `claude-profile-clone` | `claude-profiles.py clone` |
 | `claude-profile-exec` | *(shell only)* |
 | `claude-doctor` | `claude-profiles.py doctor` |
+| `claude-clear` | `claude-profiles.py clear` |
 | `claude-prune` | `claude-profiles.py prune` |
 | `claude-best` | `claude-profiles.py best` |
 | `claude-update` | `claude-profiles.py update` |

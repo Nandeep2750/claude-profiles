@@ -57,7 +57,7 @@ while IFS= read -r cmd; do
   out=$(eval "$cmd" 2>&1); rc=$?
   # these exit non-zero for legitimate reasons in a sandbox
   if [ $rc -eq 0 ] \
-     || printf '%s' "$out" | grep -qE "no sessions|no match|same profile|nothing older|not logged in"; then
+     || printf '%s' "$out" | grep -qE "no sessions|no match|same profile|nothing older|not logged in|nothing selected"; then
     PASS=$((PASS+1))
   else
     FAIL=$((FAIL+1)); printf '  FAIL  %s  (exit %s)\n' "$cmd" "$rc"

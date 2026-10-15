@@ -125,6 +125,7 @@ see [How it works](internals/index.md) for the details.
 | `claude-profiles statusline` | A status line for inside Claude Code |
 | `claude-auto` | Launch Claude on whichever account has the most room |
 | `claude-best` | Which account has the most headroom |
+| `claude-clear` | Delete one project's sessions, with a prompt |
 | `claude-prune` | Delete old transcripts (dry run by default) |
 | `claude-profiles --live` | Current usage figures instead of the cached snapshot |
 

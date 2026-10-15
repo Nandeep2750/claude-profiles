@@ -101,6 +101,18 @@ check  "  source side dir is gone"         '[ ! -d "$HOME/.claude/projects/-tmp-
 expect "refuses an unknown target"        'claude-handoff nosuch -d /tmp/proj 2>&1'         "no such profile"
 expect "refuses a traversal target"       'claude-handoff ../escape -d /tmp/proj 2>&1'      "invalid profile name"
 
+echo "-- clear --"
+_run 'mkdir -p "$HOME/work/app"; P="$HOME/.claude/projects/-tmp-clearme"; mkdir -p "$P"; S=eee55555-0000-0000-0000-000000000000; printf "{\"type\":\"user\",\"cwd\":\"$HOME/work/app\",\"message\":{\"content\":\"hello\"}}\n" > "$P/$S.jsonl"; mkdir -p "$P/$S/tool-results"; printf big > "$P/$S/tool-results/r1.txt"' >/dev/null
+expect "refuses a path that does not exist" 'claude-clear "$HOME/nope" 2>&1'                "no such path"
+expect "refuses a file"                     'claude-clear "$HOME/.claude/projects/-tmp-clearme/eee55555-0000-0000-0000-000000000000.jsonl" 2>&1' "not a directory"
+expect "says so when a directory has none"  'claude-clear "$HOME/work" 2>&1'                "no sessions recorded"
+expect "lists the directory's sessions"     'claude-clear "$HOME/work/app" --all -n --plain' "eee55555"
+check  "  dry run deleted nothing"          '[ -f "$HOME/.claude/projects/-tmp-clearme/eee55555-0000-0000-0000-000000000000.jsonl" ]'
+expect "refuses to guess without a tty"     'claude-clear "$HOME/work/app" --plain 2>&1'     "nothing selected"
+expect "deletes what was chosen"            'claude-clear "$HOME/work/app" -s eee55555 -y --plain' "freed"
+check  "  transcript is gone"               '[ ! -f "$HOME/.claude/projects/-tmp-clearme/eee55555-0000-0000-0000-000000000000.jsonl" ]'
+check  "  side files are gone"              '[ ! -d "$HOME/.claude/projects/-tmp-clearme/eee55555-0000-0000-0000-000000000000" ]'
+
 echo "-- sessions --"
 expect "lists them"                       'claude-sessions -a -d /tmp/proj'                 "SESSION ID"
 expect "  --grep matches"                 'claude-sessions -a --grep hello'                 "SESSION ID"

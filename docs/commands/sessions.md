@@ -1,7 +1,7 @@
 # Sessions
 
-Finding past conversations, moving one to another account, and clearing out old
-ones.
+Finding past conversations, moving one to another account, and deleting the
+ones you are done with.
 
 ---
 
@@ -293,6 +293,99 @@ what you want, and it does discard whatever the target had learned.
 
 ---
 
+## `claude-clear [PATH]`
+
+Delete the conversations recorded for one project directory, across every
+profile. Use it when a project is finished, or when you want a clean slate for
+it without touching anything else.
+
+```sh
+claude-clear                            # the current directory
+claude-clear ~/projects/<project-name>  # a specific project
+```
+
+It checks the path exists first, then lists what it found and asks which to
+delete:
+
+```
+3 session(s) for ~/projects/<project-name>  41.2MB across 2 profile(s)
+
+╭───┬─────────┬────────┬───────┬────────┬──────────────────────────────────────┬──────────────────────────╮
+│ # │ PROFILE │ WHEN   │ TURNS │   SIZE │ SESSION ID                           │ SUMMARY                  │
+├───┼─────────┼────────┼───────┼────────┼──────────────────────────────────────┼──────────────────────────┤
+│ 1 │ work    │ 2d ago │   191 │ 38.4MB │ c9f6d2ae-80e4-456d-a6c9-2b6c562c6313 │ set up the staging box…  │
+│ 2 │ default │ Oct 03 │    17 │  2.6MB │ 6f2c1864-f20c-4eba-b105-dbf8f4814ed9 │ fix the failing test…    │
+│ 3 │ work    │ Oct 03 │     1 │  212KB │ 2ac384e3-453d-45bb-9dd8-fa293c0b58fe │ ok                       │
+╰───┴─────────┴────────┴───────┴────────┴──────────────────────────────────────┴──────────────────────────╯
+
+which to delete?
+  2        one
+  1,3,5-7  several
+  all      every session listed
+  enter    cancel
+>
+```
+
+Pick numbers and it shows exactly which files will go, then asks once more:
+
+```
+about to delete 2 session(s), 38.6MB:
+  c9f6d2ae-80e4-456d-a6c9-2b6c562c6313  work, 191 turns, 38.4MB
+      ~/.claude-profiles/work/projects/-Users-you-projects-<project-name>/c9f6d2ae-….jsonl
+      ~/.claude-profiles/work/projects/-Users-you-projects-<project-name>/c9f6d2ae-…  (side files)
+  6f2c1864-f20c-4eba-b105-dbf8f4814ed9  default, 17 turns, 2.6MB
+      ~/.claude/projects/-Users-you-projects-<project-name>/6f2c1864-….jsonl
+
+this cannot be undone. type y to delete:
+```
+
+| Flag | Effect |
+|---|---|
+| `PATH` | project directory (default: the current one) |
+| `-p NAME`, `--profile NAME` | just one profile (default: all of them) |
+| `-r`, `--under` | also sessions started in subdirectories of `PATH` |
+| `-s ID`, `--session ID` | delete this id or prefix instead of prompting. Repeatable |
+| `-a`, `--all` | select every session listed |
+| `-n`, `--dry-run` | show what would go, delete nothing |
+| `-y`, `--yes` | skip the confirmation |
+| `--plain` | no borders |
+
+### What it looks at, and what it deletes
+
+Sessions are matched on the working directory **recorded inside** each
+transcript, not on the folder name, so a session handed between profiles is
+still found. Symlinks are resolved, so `/tmp` and `/private/tmp` match.
+
+Deleting a session removes everything that belongs to it:
+
+| Removed | Kept |
+|---|---|
+| `<session-id>.jsonl`, the conversation | `memory/` - shared by every session in the project |
+| `<session-id>.jsonl.bak`, left by a handoff | sessions for other directories |
+| `<session-id>/`, its tool results and subagent logs | sessions in subdirectories, unless you pass `-r` |
+
+Memory is deliberately left behind. It belongs to the project rather than to
+one conversation, so clearing a session must not take it. Delete the `memory/`
+folder yourself if you want that gone too.
+
+### Without a prompt
+
+For scripts, choose up front. Without a selection and without a terminal it
+refuses rather than guessing:
+
+```sh
+claude-clear ~/projects/<project-name> -s c9f6d2ae -y   # one session
+claude-clear ~/projects/<project-name> --all -y         # all of them
+claude-clear ~/projects/<project-name> --all -n         # just show the plan
+```
+
+!!! danger "There is no undo"
+    Unlike a handoff, this deletes. `claude --resume` cannot reach a cleared
+    session and no `.bak` is kept. Run it with `-n` first, and
+    [hand off](../guides/handoff.md) anything worth keeping.
+
+---
+
 ## `claude-prune`
 
 Delete old conversation transcripts. **Dry run by default.**
@@ -324,6 +417,9 @@ dry run - nothing deleted. pass --yes to delete.
 
 It reports how much space would be freed and how many newer sessions it is
 leaving alone, so you can see the what will be deleted before committing.
+
+`claude-prune` works by age across every project. To clear one project
+regardless of age, use [`claude-clear`](#claude-clear-path).
 
 !!! danger "Deleted transcripts are gone"
     There is no undo, and `claude --resume` cannot reach a deleted session.

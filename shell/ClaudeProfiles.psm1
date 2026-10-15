@@ -34,6 +34,7 @@ function Move-ClaudeSession { & $script:Py $script:Core handoff  @args }
 function Test-ClaudeProfiles  { & $script:Py $script:Core doctor @args }
 function Copy-ClaudeProfile   { & $script:Py $script:Core clone  @args }
 function Clear-ClaudeSessions { & $script:Py $script:Core prune  @args }
+function Remove-ClaudeSessions { & $script:Py $script:Core clear  @args }
 function Find-ClaudeProfile   { & $script:Py $script:Core best   @args }
 function Update-ClaudeProfiles { & $script:Py $script:Core update @args }
 
@@ -91,6 +92,7 @@ Set-Alias claude-doctor   Test-ClaudeProfiles
 Set-Alias claude-profile-clone Copy-ClaudeProfile
 Set-Alias claude-profile-exec  Invoke-ClaudeProfile
 Set-Alias claude-prune    Clear-ClaudeSessions
+Set-Alias claude-clear    Remove-ClaudeSessions
 Set-Alias claude-best     Find-ClaudeProfile
 Set-Alias claude-update   Update-ClaudeProfiles
 
